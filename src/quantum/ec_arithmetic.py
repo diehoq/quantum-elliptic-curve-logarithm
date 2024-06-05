@@ -36,7 +36,9 @@ def inpl_rsub(r, p):
 def kaliski_quantum(v, p, m):
     n = p.bit_length()
     # Convert to Montgomery
-    to_montgomery(v, p)
+    # to_montgomery(v, p)
+    montgomery_shift_container = v.m
+    v.m = 0
     u = qrisp.QuantumFloat(n)
     u[:] = p
     r = qrisp.QuantumModulus(2 * p)
@@ -50,23 +52,54 @@ def kaliski_quantum(v, p, m):
     b = qrisp.QuantumBool()
     add = qrisp.QuantumBool()
     f = qrisp.QuantumBool()
+    l = qrisp.QuantumBool()
+    
+    larger = qrisp.QuantumBool()
+    
+    lt = lambda u, v : u > v
+    lt = qrisp.redirect_qfunction(lt)
+    
+    is_zero = qrisp.QuantumBool()
+    
+    qrisp.merge([v, u, r, s, a, b, add, f, l, larger, is_zero, m])
+    
+    qs = is_zero.qs
+    
     f[:] = True
-    for i in range(2 * n):
-        is_zero = v == 0
-        qrisp.mcx([f, is_zero], m[i])
-        is_zero.uncompute()
-        qrisp.cx(m[i], f)
+    # for i in range(2 * n):
+    with qrisp.IterationEnvironment(qs = qs, iteration_amount = 2*n, precompile = True):
+        
+        # Optimization
+        # is_zero = v == 0
+        qrisp.mcx(v, is_zero, ctrl_state = 0, method = "gray_pt")
+        
+        qrisp.mcx([f, is_zero], m[0])
+        
+        qrisp.mcx(v, is_zero, ctrl_state = 0, method = "gray_pt_inv")
+        # is_zero.uncompute()
+        
+        qrisp.cx(m[0], f)
         # STEP 1
         qrisp.mcx([f, u[0]], a, ctrl_state="10")
-        qrisp.mcx([f, a, v[0]], m[i], ctrl_state="100")
+        qrisp.mcx([f, a, v[0]], m[0], ctrl_state="100")
         qrisp.cx(a, b)
-        qrisp.cx(m[i], b)
+        qrisp.cx(m[0], b)
 
         # STEP 2
-        l = u > v
+        # l = u > v
+        lt(u, v, target = l)
+        
+        # Optimization
+        qrisp.cx(a, m[0])
         qrisp.mcx([f, l, b], a, ctrl_state="110")
-        qrisp.mcx([f, l, b], m[i], ctrl_state="110")
-        l.uncompute()
+        qrisp.cx(a, m[0])
+        # qrisp.mcx([f, l, b], m[i], ctrl_state="110")
+        
+        
+        # Compile speed optimization
+        with qrisp.invert():
+            lt(u, v, target = l)
+        # l.uncompute()
 
         # STEP 3
         with qrisp.control(a):
@@ -74,14 +107,14 @@ def kaliski_quantum(v, p, m):
             qrisp.swap(r, s)
 
         # STEP 4
-        qrisp.mcx([f, b], add, ctrl_state="10")
+        qrisp.mcx([f, b], add, ctrl_state="10", method = "gray_pt")
         with qrisp.control(add):
             v -= u
             s += r
         # STEP 5
-        qrisp.mcx([f, b], add, ctrl_state="10")
+        qrisp.mcx([f, b], add, ctrl_state="10", method = "gray_pt_inv")
         # uncompute b
-        qrisp.cx(m[i], b)
+        qrisp.cx(m[0], b)
         qrisp.cx(a, b)
 
         # Division by 2
@@ -90,18 +123,25 @@ def kaliski_quantum(v, p, m):
                 qrisp.cyclic_shift(v)
 
         qrisp.cyclic_shift(r)
-        larger = r > p
-        with larger:
+        #larger = r > p
+        lt(r, p, target = larger)
+        
+        with qrisp.control(larger):
             r -= p
         qrisp.cx(r[0], larger)
-        larger.delete()
+        
 
         with qrisp.control(a):
             qrisp.swap(u, v)
             qrisp.swap(r, s)
         # uncompute a
         qrisp.mcx([s[0]], a, ctrl_state="0")
+        
+        qrisp.cyclic_shift(m)
 
+    larger.delete()
+    l.delete()
+    is_zero.delete()
     a.delete()
     add.delete()
     b.delete()
@@ -117,10 +157,15 @@ def kaliski_quantum(v, p, m):
     qrisp.x(u[0])
     u.delete()
     r.delete()
+    
+    # Optimization
     s -= p
+    # qrisp.cx(p, s)
     s.delete()
     # Convert back to standard representation
-    to_standard(v, p)
+    
+    #to_standard(v, p)
+    v.m = -montgomery_shift_container
     return v
 
 
