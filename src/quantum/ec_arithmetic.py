@@ -133,7 +133,7 @@ def qrisp_ell_double(P, curve):
     return [xr, (p - yr) % p]
 
 
-@qrisp.custom_control
+# @qrisp.custom_control
 def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     # return the result of P + Q
     # Following C3 in the paper
@@ -192,7 +192,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     for a in m:
         a.delete()
 
-    l.delete()
+    l.delete(verify = True)
     if ctrl is None:
         anc[1] -= G[1]  # step 16
     else:
