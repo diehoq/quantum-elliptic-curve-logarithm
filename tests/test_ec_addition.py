@@ -12,7 +12,14 @@ curves_with_points = [
     # NOTICE: A CHAIN SHOULD BE CHOSEN FOR EACH CURVE BEFORE LAUNCHING THE TESTS
     {
         "curve_params": {"a": 5, "b": 4, "p": 7},
-        "points": [(2,1), (4,5), (0,2), (5,0), (0,5), (4,2),],
+        "points": [
+            (2, 1),
+            (4, 5),
+            (0, 2),
+            (5, 0),
+            (0, 5),
+            (4, 2),
+        ],
         "base_point": (3, 5),
     },
     # {
