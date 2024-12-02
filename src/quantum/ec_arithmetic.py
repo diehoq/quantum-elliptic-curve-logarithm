@@ -44,8 +44,6 @@ def kaliski_quantum(v, p, m):
     s = qrisp.QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
     s[:] = 1
 
-    v.__class__ = qrisp.QuantumFloat
-
     a = qrisp.QuantumBool()
     b = qrisp.QuantumBool()
     add = qrisp.QuantumBool()
@@ -108,7 +106,6 @@ def kaliski_quantum(v, p, m):
 
     inpl_rsub(r, p)
 
-    v.__class__ = qrisp.QuantumModulus
     for i in range(v.size):
         qrisp.swap(v[i], r[i])
 
