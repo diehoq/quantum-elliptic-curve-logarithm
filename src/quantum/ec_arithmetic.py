@@ -39,12 +39,10 @@ def kaliski_quantum(v, p, m):
     to_montgomery(v, p)
     u = qrisp.QuantumFloat(n)
     u[:] = p
-    r = qrisp.QuantumModulus(2 * p)
+    r = qrisp.QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
     r[:] = 0
-    s = qrisp.QuantumModulus(2 * p)
+    s = qrisp.QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
     s[:] = 1
-
-    v.__class__ = qrisp.QuantumFloat
 
     a = qrisp.QuantumBool()
     b = qrisp.QuantumBool()
@@ -76,7 +74,8 @@ def kaliski_quantum(v, p, m):
         # STEP 4
         qrisp.mcx([f, b], add, ctrl_state="10")
         with qrisp.control(add):
-            v -= u
+            with qrisp.invert():
+                v.inpl_adder(u, v)
             s += r
         # STEP 5
         qrisp.mcx([f, b], add, ctrl_state="10")
@@ -108,7 +107,6 @@ def kaliski_quantum(v, p, m):
 
     inpl_rsub(r, p)
 
-    v.__class__ = qrisp.QuantumModulus
     for i in range(v.size):
         qrisp.swap(v[i], r[i])
 
@@ -145,7 +143,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     anc[0] -= G[0]  # step 1
 
     m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
-    l = qrisp.QuantumModulus(p)
+    l = qrisp.QuantumModulus(p, inpl_adder=anc[0].inpl_adder)
     with qrisp.conjugate(kaliski_quantum)(anc[0], p, m) as inv:
         temp = anc[1] * inv
         to_standard_qm(temp)
