@@ -74,7 +74,8 @@ def kaliski_quantum(v, p, m):
         # STEP 4
         qrisp.mcx([f, b], add, ctrl_state="10")
         with qrisp.control(add):
-            v -= u
+            with qrisp.invert():
+                v.inpl_adder(u, v)
             s += r
         # STEP 5
         qrisp.mcx([f, b], add, ctrl_state="10")
