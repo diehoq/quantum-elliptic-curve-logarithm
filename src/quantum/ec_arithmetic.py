@@ -213,10 +213,12 @@ def qrisp_ell_mult_add(power, res, k, curve):
     n = k.size
     p = curve.p
     qrisp.merge([res, k])
-    with qrisp.IterationEnvironment(res.qs, n, precompile=True):
-        with qrisp.control(k[0]):
+    
+    # with qrisp.IterationEnvironment(res.qs, n, precompile=True):
+    for i in range(n):
+        with qrisp.control(k[i]):
             res = qrisp_ell_add_inpl(res, power, p)
-        with qrisp.invert():
-            qrisp.cyclic_shift(k)
+        # with qrisp.invert():
+            # qrisp.cyclic_shift(k)
         power = qrisp_ell_double(power, curve)
     return res
