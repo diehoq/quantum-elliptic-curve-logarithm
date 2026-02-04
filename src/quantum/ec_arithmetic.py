@@ -1,4 +1,21 @@
-import qrisp
+from qrisp import (
+    QuantumBool,
+    QuantumModulus,
+    QuantumFloat,
+    QuantumArray,
+    swap,
+    control,
+    conjugate,
+    invert,
+    jrange,
+    mcx,
+    cx,
+    x,
+    merge,
+    singular_shift,
+    custom_control,
+    
+)
 
 
 def to_montgomery(x, p):
@@ -26,7 +43,7 @@ def to_standard_qm(x):
 
 # Consider moving this function to qrisp source code
 def inpl_rsub(r, p):
-    qrisp.x(r)
+    x(r)
     r.inpl_adder(r.modulus + 1, r)
     r += p
 
@@ -36,70 +53,77 @@ def inpl_rsub(r, p):
 def kaliski_quantum(v, p, m):
     n = p.bit_length()
     # Convert to Montgomery
-    to_montgomery(v, p)
-    u = qrisp.QuantumFloat(n)
+    # to_montgomery(v, p) #Does not work
+    u = QuantumFloat(n)
     u[:] = p
-    r = qrisp.QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
+    r = QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
     r[:] = 0
-    s = qrisp.QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
+    s = QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
     s[:] = 1
 
-    a = qrisp.QuantumBool()
-    b = qrisp.QuantumBool()
-    add = qrisp.QuantumBool()
-    f = qrisp.QuantumBool()
+    a = QuantumBool()
+    b = QuantumBool()
+    add = QuantumBool()
+    f = QuantumBool()
     f[:] = True
-    for i in range(2 * n):
-        is_zero = v == 0
-        qrisp.mcx([f, is_zero], m[i])
-        is_zero.uncompute()
-        qrisp.cx(m[i], f)
+    for i in jrange(2 * n):
+        is_zero = QuantumBool()
+        compare_func = lambda x, y: x == y
+        injecteted_comp_func = is_zero << compare_func
+        with conjugate(injecteted_comp_func)(v, 0):
+            mcx([f, is_zero], m[i])
+        is_zero.delete()
+        cx(m[i], f)
         # STEP 1
-        qrisp.mcx([f, u[0]], a, ctrl_state="10")
-        qrisp.mcx([f, a, v[0]], m[i], ctrl_state="100")
-        qrisp.cx(a, b)
-        qrisp.cx(m[i], b)
+        mcx([f, u[0]], a, ctrl_state="10")
+        mcx([f, a, v[0]], m[i], ctrl_state="100")
+        cx(a, b)
+        cx(m[i], b)
 
         # STEP 2
-        l = u > v
-        qrisp.mcx([f, l, b], a, ctrl_state="110")
-        qrisp.mcx([f, l, b], m[i], ctrl_state="110")
-        l.uncompute()
+        l = QuantumBool()
+        compare_func = lambda x, y: x > y
+        injecteted_comp_func = l << compare_func
+        with conjugate(injecteted_comp_func)(u, v):
+            mcx([f, l, b], a, ctrl_state="110")
+            mcx([f, l, b], m[i], ctrl_state="110")
+        l.delete()
 
         # STEP 3
-        with qrisp.control(a):
-            qrisp.swap(u, v)
-            qrisp.swap(r, s)
+        with control(a):
+            swap(u, v)
+            swap(r, s)
 
         # STEP 4
-        qrisp.mcx([f, b], add, ctrl_state="10")
-        with qrisp.control(add):
-            with qrisp.invert():
+        mcx([f, b], add, ctrl_state="10")
+        with control(add):
+            with invert():
                 v.inpl_adder(u, v)
             s += r
         # STEP 5
-        qrisp.mcx([f, b], add, ctrl_state="10")
+        mcx([f, b], add, ctrl_state="10")
         # uncompute b
-        qrisp.cx(m[i], b)
-        qrisp.cx(a, b)
+        cx(m[i], b)
+        cx(a, b)
 
         # Division by 2
-        with qrisp.control(f):
-            with qrisp.invert():
-                qrisp.cyclic_shift(v)
+        with control(f):
+            with invert():
+                singular_shift(v)
 
-        qrisp.cyclic_shift(r)
+        singular_shift(r)
+
         larger = r > p
-        with larger:
+        with control(larger):
             r -= p
-        qrisp.cx(r[0], larger)
+        cx(r[0], larger[0])
         larger.delete()
 
-        with qrisp.control(a):
-            qrisp.swap(u, v)
-            qrisp.swap(r, s)
+        with control(a):
+            swap(u, v)
+            swap(r, s)
         # uncompute a
-        qrisp.mcx([s[0]], a, ctrl_state="0")
+        mcx([s[0]], a, ctrl_state="0")
 
     a.delete()
     add.delete()
@@ -107,12 +131,12 @@ def kaliski_quantum(v, p, m):
 
     inpl_rsub(r, p)
 
-    for i in range(v.size):
-        qrisp.swap(v[i], r[i])
+    for i in jrange(v.size):
+        swap(v[i], r[i])
 
-    # Uncompute u,s,f
+    # # Uncompute u,s,f
     f.delete()
-    qrisp.x(u[0])
+    x(u[0])
     u.delete()
     r.delete()
     s -= p
@@ -131,20 +155,20 @@ def qrisp_ell_double(P, curve):
     return [xr, (p - yr) % p]
 
 
-@qrisp.custom_control
+@custom_control
 def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     # return the result of P + Q
     # Following C3 in the paper
     if ctrl is None:
         anc[1] -= G[1]
     else:
-        with qrisp.control(ctrl):
+        with control(ctrl):
             anc[1] -= G[1]  # step 2 //ctrl_sub_const_modp
     anc[0] -= G[0]  # step 1
 
-    m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
-    l = qrisp.QuantumModulus(p, inpl_adder=anc[0].inpl_adder)
-    with qrisp.conjugate(kaliski_quantum)(anc[0], p, m) as inv:
+    m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
+    l = QuantumModulus(p, inpl_adder=anc[0].inpl_adder)
+    with conjugate(kaliski_quantum)(anc[0], p, m) as inv:
         temp = anc[1] * inv
         to_standard_qm(temp)
         l[:] = temp  # step 3 & 4 & 6
@@ -161,7 +185,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     if ctrl is None:
         anc[0] += 3 * G[0]
     else:
-        with qrisp.control(ctrl):
+        with control(ctrl):
             anc[0] += 3 * G[0]  # step 9 //ctrl_add_const_modp
 
     temp = l * l  # step 7
@@ -169,7 +193,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     if ctrl is None:
         anc[0] -= temp  # step 8
     else:
-        with qrisp.control(ctrl):
+        with control(ctrl):
             anc[0] -= temp  # step 8 //ctrl_sub_modp
     temp.uncompute()  # step 10
 
@@ -179,12 +203,12 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     anc[1] += temp
     temp.uncompute()
 
-    m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
+    m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
 
-    with qrisp.conjugate(kaliski_quantum)(anc[0], p, m) as inv:
+    with conjugate(kaliski_quantum)(anc[0], p, m) as inv:
         temp = anc[1] * inv
         to_standard_qm(temp)
-        qrisp.cx(temp, l)
+        cx(temp, l)
         temp.uncompute()
 
     for a in m:
@@ -194,7 +218,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     if ctrl is None:
         anc[1] -= G[1]  # step 16
     else:
-        with qrisp.control(ctrl):
+        with control(ctrl):
             anc[1] -= G[1]  # step 16 //ctrl_sub_const_modp
 
     anc[0] -= G[0]  # step 17
@@ -202,7 +226,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     if ctrl is None:
         inpl_rsub(anc[0], p)  # step 15
     else:
-        with qrisp.control(ctrl):
+        with control(ctrl):
             inpl_rsub(anc[0], p)  # step 15 //ctrl_neg_modp
 
     return anc
@@ -212,13 +236,13 @@ def qrisp_ell_mult_add(power, res, k, curve):
     # Elliptic curve multiplication Q + kP
     n = k.size
     p = curve.p
-    qrisp.merge([res, k])
-    
-    # with qrisp.IterationEnvironment(res.qs, n, precompile=True):
+    merge([res, k])
+
+    # with IterationEnvironment(res.qs, n, precompile=True):
     for i in range(n):
-        with qrisp.control(k[i]):
+        with control(k[i]):
             res = qrisp_ell_add_inpl(res, power, p)
-        # with qrisp.invert():
-            # qrisp.cyclic_shift(k)
+        # with invert():
+        # cyclic_shift(k)
         power = qrisp_ell_double(power, curve)
     return res
