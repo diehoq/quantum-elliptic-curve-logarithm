@@ -53,7 +53,7 @@ def inpl_rsub(r, p):
 def kaliski_quantum(v, p, m):
     n = p.bit_length()
     # Convert to Montgomery
-    # to_montgomery(v, p) #Does not work
+    to_montgomery(v, p) 
     u = QuantumFloat(n)
     u[:] = p
     r = QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
