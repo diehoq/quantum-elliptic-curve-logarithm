@@ -22,10 +22,10 @@ def test_kaliski_quantum(v_cl, p):
     v[:] = v_cl
     m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
 
-    quantum_inverse = qECarithm.kaliski_quantum(v, p, m)
-    assert quantum_inverse.get_measurement() == {
+    qECarithm.kaliski_quantum(v, p, m)
+    assert v.get_measurement() == {
         expected_inverse: 1
-    }, f"Quantum inverse {quantum_inverse} did not match expected {expected_inverse} for v={v}, p={p}"
+    }, f"Quantum inverse did not match expected {expected_inverse} for v_cl={v_cl}, p={p}"
 
 
 @pytest.mark.parametrize("v_cl", range(1, 23))
@@ -44,7 +44,7 @@ def test_kaliski_quantum_dynamic(v_cl, p):
         v = QuantumModulus(p)
         v[:] = v_cl
         m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
-        v = qECarithm.kaliski_quantum(v, p, m)
+        qECarithm.kaliski_quantum(v, p, m)
         return measure(v)
     
     result = main(v_cl)
