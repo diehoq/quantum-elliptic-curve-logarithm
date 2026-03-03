@@ -31,10 +31,14 @@ def to_standard(x, p):
 
 
 def to_montgomery_qm(x, montgomery_shift):
-    x *= pow(2, montgomery_shift, x.modulus)
+    
+    #N = int(x.modulus)
+    R_mod_N = pow(2, montgomery_shift)
+    x*=R_mod_N
+    
     x.m = montgomery_shift
 
-
+    
 def to_standard_qm(x):
     montgomery_shift = x.m
     x *= pow(2, -montgomery_shift, x.modulus)
@@ -143,7 +147,7 @@ def kaliski_quantum(v, p, m):
     s.delete()
     # Convert back to standard representation
     to_standard(v, p)
-    return v
+    # return v
 
 
 def qrisp_ell_double(P, curve):
@@ -159,6 +163,10 @@ def qrisp_ell_double(P, curve):
 def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     # return the result of P + Q
     # Following C3 in the paper
+    # Recover p as a Python int since @custom_control may trace it
+    p = int(anc[0].modulus)
+    mul_func = lambda x, y: x * y
+
     if ctrl is None:
         anc[1] -= G[1]
     else:
@@ -168,19 +176,23 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
 
     m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
     l = QuantumModulus(p, inpl_adder=anc[0].inpl_adder)
-    with conjugate(kaliski_quantum)(anc[0], p, m) as inv:
-        temp = anc[1] * inv
-        to_standard_qm(temp)
-        l[:] = temp  # step 3 & 4 & 6
-        temp.uncompute()
-    for a in m:
-        a.delete()
-    # step 5
-    temp = l * anc[0]
-    to_standard_qm(temp)
-    anc[1] -= temp
-    temp.uncompute()
-    # anc[1].delete()
+    # step 3 & 4 & 6: compute (anc[1] * kaliski_inv(anc[0])) in standard form -> l
+    with conjugate(kaliski_quantum)(anc[0], p, m):
+        temp = QuantumModulus(p)
+        injected_mul = temp << mul_func
+        with conjugate(injected_mul)(anc[1], anc[0]):
+            with conjugate(to_standard_qm)(temp):
+                cx(temp, l)
+        temp.delete()
+    m.delete()
+
+    # step 5: anc[1] -= l * anc[0] (in standard form)
+    temp = QuantumModulus(p)
+    injected_mul = temp << mul_func
+    with conjugate(injected_mul)(l, anc[0]):
+        with conjugate(to_standard_qm)(temp):
+            anc[1] -= temp
+    temp.delete()
 
     if ctrl is None:
         anc[0] += 3 * G[0]
@@ -188,31 +200,36 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
         with control(ctrl):
             anc[0] += 3 * G[0]  # step 9 //ctrl_add_const_modp
 
-    temp = l * l  # step 7
-    to_standard_qm(temp)
-    if ctrl is None:
-        anc[0] -= temp  # step 8
-    else:
-        with control(ctrl):
-            anc[0] -= temp  # step 8 //ctrl_sub_modp
-    temp.uncompute()  # step 10
+    # step 7 & 8: anc[0] -= l * l (in standard form)
+    temp = QuantumModulus(p)
+    injected_mul = temp << mul_func
+    with conjugate(injected_mul)(l, l):
+        with conjugate(to_standard_qm)(temp):
+            if ctrl is None:
+                anc[0] -= temp  # step 8
+            else:
+                with control(ctrl):
+                    anc[0] -= temp  # step 8 //ctrl_sub_modp
+    temp.delete()  # step 10
 
-    # step 11
-    temp = l * anc[0]
-    to_standard_qm(temp)
-    anc[1] += temp
-    temp.uncompute()
+    # step 11: anc[1] += l * anc[0] (in standard form)
+    temp = QuantumModulus(p)
+    injected_mul = temp << mul_func
+    with conjugate(injected_mul)(l, anc[0]):
+        with conjugate(to_standard_qm)(temp):
+            anc[1] += temp
+    temp.delete()
 
+    # step 12-14: uncompute l via second kaliski inversion
     m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
-
-    with conjugate(kaliski_quantum)(anc[0], p, m) as inv:
-        temp = anc[1] * inv
-        to_standard_qm(temp)
-        cx(temp, l)
-        temp.uncompute()
-
-    for a in m:
-        a.delete()
+    with conjugate(kaliski_quantum)(anc[0], p, m):
+        temp = QuantumModulus(p)
+        injected_mul = temp << mul_func
+        with conjugate(injected_mul)(anc[1], anc[0]):
+            with conjugate(to_standard_qm)(temp):
+                cx(temp, l)
+        temp.delete()
+    m.delete()
 
     l.delete()
     if ctrl is None:
@@ -228,8 +245,6 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     else:
         with control(ctrl):
             inpl_rsub(anc[0], p)  # step 15 //ctrl_neg_modp
-
-    return anc
 
 
 def qrisp_ell_mult_add(power, res, k, curve):
