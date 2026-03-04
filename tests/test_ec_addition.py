@@ -105,18 +105,19 @@ def test_ec_addition(curve_data):
 
     base_point_ell = clECarithm.EllPoint(base_point_coords[0], base_point_coords[1])
     base_point_qrisp = list(base_point_coords)
-    mod_p = qrisp.QuantumModulus(curve_params["p"])
 
     for point in points:
         P_ell = clECarithm.EllPoint(point[0], point[1])
-        anc = qrisp.QuantumArray(qtype=mod_p, shape=(2,))
-        anc[:] = [point[0], point[1]]
+        anc_0 = qrisp.QuantumModulus(curve_params["p"])
+        anc_0[:] = point[0]
+        anc_1 = qrisp.QuantumModulus(curve_params["p"])
+        anc_1[:] = point[1]
 
         result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
         qECarithm.qrisp_ell_add_inpl(
-            anc, base_point_qrisp, curve_params["p"]
+            [anc_0, anc_1], base_point_qrisp, curve_params["p"]
         )
 
-        assert qrisp.multi_measurement(anc) == {
+        assert qrisp.multi_measurement([anc_0, anc_1]) == {
             (result_ell.x, result_ell.y): 1
         }, f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
