@@ -113,10 +113,10 @@ def test_ec_addition(curve_data):
         anc[:] = [point[0], point[1]]
 
         result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
-        result_qrisp = qECarithm.qrisp_ell_add_inpl(
+        qECarithm.qrisp_ell_add_inpl(
             anc, base_point_qrisp, curve_params["p"]
         )
 
-        assert qrisp.multi_measurement(result_qrisp) == {
+        assert qrisp.multi_measurement(anc) == {
             (result_ell.x, result_ell.y): 1
         }, f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
