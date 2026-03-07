@@ -1,4 +1,4 @@
-import jax.numpy as jnp
+import math
 from qrisp import (
     QuantumBool,
     QuantumModulus,
@@ -171,7 +171,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     # Montgomery reduction shift: injection (<<) doesn't propagate .m from
     # the multiplication result, so we set it manually after each injection.
     n_bits = p.bit_length()
-    m_red = int(jnp.ceil(jnp.log2((p - 1) ** 2) + 1)) - n_bits
+    m_red = int(math.ceil(math.log2((p - 1) ** 2) + 1)) - n_bits
 
     if ctrl is None:
         anc[1] -= G[1]
