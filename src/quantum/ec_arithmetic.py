@@ -1,3 +1,4 @@
+import jax.numpy as jnp
 from qrisp import (
     QuantumBool,
     QuantumModulus,
@@ -167,6 +168,11 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     p = int(anc[0].modulus)
     mul_func = lambda x, y: x * y
 
+    # Montgomery reduction shift: injection (<<) doesn't propagate .m from
+    # the multiplication result, so we set it manually after each injection.
+    n_bits = p.bit_length()
+    m_red = int(jnp.ceil(jnp.log2((p - 1) ** 2) + 1)) - n_bits
+
     if ctrl is None:
         anc[1] -= G[1]
     else:
@@ -181,6 +187,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
         temp = QuantumModulus(p)
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
+            temp.m = -m_red
             with conjugate(to_standard_qm)(temp):
                 cx(temp, l)
         temp.delete()
@@ -190,6 +197,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     temp = QuantumModulus(p)
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, anc[0]):
+        temp.m = -m_red
         with conjugate(to_standard_qm)(temp):
             anc[1] -= temp
     temp.delete()
@@ -204,6 +212,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     temp = QuantumModulus(p)
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, l):
+        temp.m = -m_red
         with conjugate(to_standard_qm)(temp):
             if ctrl is None:
                 anc[0] -= temp  # step 8
@@ -216,6 +225,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     temp = QuantumModulus(p)
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, anc[0]):
+        temp.m = -m_red
         with conjugate(to_standard_qm)(temp):
             anc[1] += temp
     temp.delete()
@@ -226,6 +236,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
         temp = QuantumModulus(p)
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
+            temp.m = -m_red
             with conjugate(to_standard_qm)(temp):
                 cx(temp, l)
         temp.delete()
@@ -253,7 +264,6 @@ def qrisp_ell_mult_add(power, res, k, curve):
     p = curve.p
     merge([res, k])
 
-    # with IterationEnvironment(res.qs, n, precompile=True):
     for i in range(n):
         with control(k[i]):
             res = qrisp_ell_add_inpl(res, power, p)
