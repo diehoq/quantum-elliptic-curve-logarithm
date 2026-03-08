@@ -15,15 +15,13 @@ from qrisp import (
     merge,
     singular_shift,
     custom_control,
-    
+    qache 
 )
-
 
 def to_montgomery(x, p):
     n = p.bit_length()
     x *= 2**n % p
     return x
-
 
 def to_standard(x, p):
     n = p.bit_length()
@@ -55,6 +53,7 @@ def inpl_rsub(r, p):
 
 # Consider moving this function to qrisp source code
 # This function is used to compute the modular inverse of a number
+@qache(static_argnums=[1])
 def kaliski_quantum(v, p, m):
     n = p.bit_length()
     # Convert to Montgomery
