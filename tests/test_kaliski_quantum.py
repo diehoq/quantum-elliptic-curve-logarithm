@@ -1,7 +1,8 @@
 import src.quantum.ec_arithmetic as qECarithm
 import pytest
 import qrisp
-from qrisp import measure, QuantumModulus, QuantumArray, QuantumBool, jaspify
+from qrisp import measure, QuantumModulus, QuantumArray, QuantumBool,boolean_simulation, jaspify
+
 
 
 primes = [3, 5, 7]  #11 , 13, 17, 19, 23]
@@ -39,7 +40,8 @@ def test_kaliski_quantum_dynamic(v_cl, p):
     except ValueError:
         pytest.skip(f"No modular inverse exists for v={v_cl}, p={p} (non-coprime)")
     
-    @jaspify
+    #@jaspify
+    @boolean_simulation
     def main(v_cl):
         v = QuantumModulus(p)
         v[:] = v_cl

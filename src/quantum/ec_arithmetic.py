@@ -172,6 +172,12 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     n_bits = p.bit_length()
     m_red = math.ceil(math.log2((p - 1) ** 2) + 1) - n_bits
 
+    # Precompute constants for manual to_standard / to_montgomery.
+    # conjugate(to_standard_qm) has a faulty-uncomputation bug under
+    # boolean_simulation, so we apply the conversion manually.
+    fwd_const = pow(2, m_red, p)   # to_standard multiplier
+    rev_const = pow(2, -m_red, p)  # to_montgomery multiplier (inverse)
+
     if ctrl is None:
         anc[1] -= G[1]
     else:
@@ -187,8 +193,11 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
             temp.m = -m_red
-            with conjugate(to_standard_qm)(temp):
-                cx(temp, l)
+            temp *= fwd_const
+            temp.m = 0
+            cx(temp, l)  # copy standard value
+            temp *= rev_const
+            temp.m = -m_red
         temp.delete()
     m.delete()
 
@@ -197,8 +206,11 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, anc[0]):
         temp.m = -m_red
-        with conjugate(to_standard_qm)(temp):
-            anc[1] -= temp
+        temp *= fwd_const
+        temp.m = 0
+        anc[1] -= temp
+        temp *= rev_const
+        temp.m = -m_red
     temp.delete()
 
     if ctrl is None:
@@ -212,12 +224,15 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, l):
         temp.m = -m_red
-        with conjugate(to_standard_qm)(temp):
-            if ctrl is None:
-                anc[0] -= temp  # step 8
-            else:
-                with control(ctrl):
-                    anc[0] -= temp  # step 8 //ctrl_sub_modp
+        temp *= fwd_const
+        temp.m = 0
+        if ctrl is None:
+            anc[0] -= temp  # step 8
+        else:
+            with control(ctrl):
+                anc[0] -= temp  # step 8 //ctrl_sub_modp
+        temp *= rev_const
+        temp.m = -m_red
     temp.delete()  # step 10
 
     # step 11: anc[1] += l * anc[0] (in standard form)
@@ -225,8 +240,11 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, anc[0]):
         temp.m = -m_red
-        with conjugate(to_standard_qm)(temp):
-            anc[1] += temp
+        temp *= fwd_const
+        temp.m = 0
+        anc[1] += temp
+        temp *= rev_const
+        temp.m = -m_red
     temp.delete()
 
     # step 12-14: uncompute l via second kaliski inversion
@@ -236,8 +254,11 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
             temp.m = -m_red
-            with conjugate(to_standard_qm)(temp):
-                cx(temp, l)
+            temp *= fwd_const
+            temp.m = 0
+            cx(temp, l)  # XOR cancels: l ^= standard_temp, l becomes 0
+            temp *= rev_const
+            temp.m = -m_red
         temp.delete()
     m.delete()
 
