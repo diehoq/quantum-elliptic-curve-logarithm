@@ -269,13 +269,13 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
         with control(ctrl):
             anc[1] -= G[1]  # step 16 //ctrl_sub_const_modp
 
-    anc[0] -= G[0]  # step 17
-
     if ctrl is None:
         inpl_rsub(anc[0], p)  # step 15
     else:
         with control(ctrl):
             inpl_rsub(anc[0], p)  # step 15 //ctrl_neg_modp
+
+    anc[0] += G[0]  # step 17 (unconditional: undoes step 1)
 
 
 def qrisp_ell_mult_add(power, res, k, curve):
@@ -286,7 +286,7 @@ def qrisp_ell_mult_add(power, res, k, curve):
 
     for i in range(n):
         with control(k[i]):
-            res = qrisp_ell_add_inpl(res, power, p)
+            qrisp_ell_add_inpl(res, power, p)
         # with invert():
         # cyclic_shift(k)
         power = qrisp_ell_double(power, curve)
