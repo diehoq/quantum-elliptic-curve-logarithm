@@ -35,7 +35,7 @@ anc[:] = [2,6]
 
 G = [0,5]
 
-res_ec_add = qECarithm.qrisp_ell_add_inpl(anc, G, p)
+res_ec_add = qECarithm.q_ec_add_inpl(anc, G, p)
 
 bm = benchmark_circuit(res_ec_add[0])
 print(bm)

@@ -114,7 +114,7 @@ def test_ec_addition(curve_data):
         anc_1[:] = point[1]
 
         result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
-        qECarithm.qrisp_ell_add_inpl(
+        qECarithm.q_ec_add_inpl(
             [anc_0, anc_1], base_point_qrisp, curve_params["p"]
         )
 
@@ -150,7 +150,7 @@ def test_ec_addition_dynamic(curve_data):
             anc_0[:] = point[0]
             anc_1 = qrisp.QuantumModulus(p)
             anc_1[:] = point[1]
-            qECarithm.qrisp_ell_add_inpl(
+            qECarithm.q_ec_add_inpl(
                 [anc_0, anc_1], base_point_qrisp, p
             )
             return qrisp.measure(anc_0), qrisp.measure(anc_1)

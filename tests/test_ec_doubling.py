@@ -91,7 +91,7 @@ def test_ec_doubling(curve_data):
         point_ell = clECarithm.EllPoint(point[0], point[1])
 
         result_ell = clECarithm.ell_double(point_ell, curve)
-        result_qrisp = qECarithm.qrisp_ell_double(point, curve)
+        result_qrisp = qECarithm.q_ec_double(point, curve)
 
         assert result_ell.x == result_qrisp[0]
         assert result_ell.y == result_qrisp[1]

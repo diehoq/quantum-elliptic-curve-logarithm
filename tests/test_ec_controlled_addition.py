@@ -23,7 +23,7 @@ def test_controlled_addition_ctrl_on():
     anc_1[:] = P[1]
 
     with qrisp.control(ctrl):
-        qECarithm.qrisp_ell_add_inpl([anc_0, anc_1], list(G), CURVE.p)
+        qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G), CURVE.p)
 
     result = qrisp.multi_measurement([anc_0, anc_1])
     assert result == {(R.x, R.y): 1}, (
@@ -41,7 +41,7 @@ def test_controlled_addition_ctrl_off():
     anc_1[:] = P[1]
 
     with qrisp.control(ctrl):
-        qECarithm.qrisp_ell_add_inpl([anc_0, anc_1], list(G), CURVE.p)
+        qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G), CURVE.p)
 
     result = qrisp.multi_measurement([anc_0, anc_1])
     assert result == {(P[0], P[1]): 1}, (

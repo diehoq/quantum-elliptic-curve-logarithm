@@ -54,7 +54,7 @@ def inpl_rsub(r, p):
 # Consider moving this function to qrisp source code
 # This function is used to compute the modular inverse of a number
 @qache(static_argnums=[1])
-def kaliski_quantum(v, p, m):
+def kaliski_mod_inv(v, p, m):
     n = p.bit_length()
     # Convert to Montgomery
     to_montgomery(v, p) 
@@ -150,7 +150,7 @@ def kaliski_quantum(v, p, m):
     # return v
 
 
-def qrisp_ell_double(P, curve):
+def q_ec_double(P, curve):
     p = curve.p
     s = ((3 * (P[0] * P[0] % p) + curve.a) % p) * pow((2 * P[1]) % p, -1, p)
     xr = (s * s - 2 * P[0]) % p
@@ -160,7 +160,7 @@ def qrisp_ell_double(P, curve):
 
 
 @custom_control
-def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
+def q_ec_add_inpl(anc, G, p, ctrl=None):
     # return the result of P + Q
     # Following C3 in the paper
     # Recover p as a Python int since @custom_control may trace it
@@ -188,7 +188,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
     l = QuantumModulus(p, inpl_adder=anc[0].inpl_adder)
     # step 3 & 4 & 6: compute (anc[1] * kaliski_inv(anc[0])) in standard form -> l
-    with conjugate(kaliski_quantum)(anc[0], p, m):
+    with conjugate(kaliski_mod_inv)(anc[0], p, m):
         temp = QuantumModulus(p)
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
@@ -249,7 +249,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
 
     # step 12-14: uncompute l via second kaliski inversion
     m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
-    with conjugate(kaliski_quantum)(anc[0], p, m):
+    with conjugate(kaliski_mod_inv)(anc[0], p, m):
         temp = QuantumModulus(p)
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
@@ -278,7 +278,7 @@ def qrisp_ell_add_inpl(anc, G, p, ctrl=None):
     anc[0] += G[0]  # step 17 (unconditional: undoes step 1)
 
 
-def qrisp_ell_mult_add(power, res, k, curve):
+def q_ec_mult_add(power, res, k, curve):
     # Elliptic curve multiplication Q + kP
     n = k.size
     p = curve.p
@@ -286,8 +286,8 @@ def qrisp_ell_mult_add(power, res, k, curve):
 
     for i in range(n):
         with control(k[i]):
-            qrisp_ell_add_inpl(res, power, p)
+            q_ec_add_inpl(res, power, p)
         # with invert():
         # cyclic_shift(k)
-        power = qrisp_ell_double(power, curve)
+        power = q_ec_double(power, curve)
     return res

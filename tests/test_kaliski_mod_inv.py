@@ -10,7 +10,7 @@ primes = [3, 5, 7]  #11 , 13, 17, 19, 23]
 
 @pytest.mark.parametrize("v_cl", range(1, 23))
 @pytest.mark.parametrize("p", primes)
-def test_kaliski_quantum(v_cl, p):
+def test_kaliski_mod_inv(v_cl, p):
     if v_cl >= p:
         pytest.skip()
 
@@ -23,7 +23,7 @@ def test_kaliski_quantum(v_cl, p):
     v[:] = v_cl
     m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
 
-    qECarithm.kaliski_quantum(v, p, m)
+    qECarithm.kaliski_mod_inv(v, p, m)
     assert v.get_measurement() == {
         expected_inverse: 1
     }, f"Quantum inverse did not match expected {expected_inverse} for v_cl={v_cl}, p={p}"
@@ -31,7 +31,7 @@ def test_kaliski_quantum(v_cl, p):
 
 @pytest.mark.parametrize("v_cl", range(1, 23))
 @pytest.mark.parametrize("p", primes)
-def test_kaliski_quantum_dynamic(v_cl, p):
+def test_kaliski_mod_inv_dynamic(v_cl, p):
     if v_cl >= p:
         pytest.skip()
 
@@ -46,7 +46,7 @@ def test_kaliski_quantum_dynamic(v_cl, p):
         v = QuantumModulus(p)
         v[:] = v_cl
         m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
-        qECarithm.kaliski_quantum(v, p, m)
+        qECarithm.kaliski_mod_inv(v, p, m)
         return measure(v)
     
     result = main(v_cl)

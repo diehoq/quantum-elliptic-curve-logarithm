@@ -32,7 +32,7 @@ def test_ell_mult_add(k_val, n_bits):
     k = qrisp.QuantumFloat(n_bits)
     k[:] = k_val
 
-    result = qECarithm.qrisp_ell_mult_add(list(P), [res_0, res_1], k, CURVE)
+    result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE)
 
     meas = qrisp.multi_measurement([result[0], result[1]])
     assert meas == {(expected.x, expected.y): 1}, (
