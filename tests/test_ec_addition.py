@@ -121,3 +121,49 @@ def test_ec_addition(curve_data):
         assert qrisp.multi_measurement([anc_0, anc_1]) == {
             (result_ell.x, result_ell.y): 1
         }, f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
+
+@pytest.mark.skip
+@pytest.mark.parametrize("curve_data", curves_with_points)
+def test_ec_addition_dynamic(curve_data):
+    """Test EC addition under @boolean_simulation (dynamic/JAX mode)."""
+    import warnings
+
+    curve_params = curve_data["curve_params"]
+    points = curve_data["points"]
+    base_point_coords = curve_data["base_point"]
+
+    curve = clECarithm.EllCurve(
+        a=curve_params["a"], b=curve_params["b"], p=curve_params["p"]
+    )
+
+    base_point_ell = clECarithm.EllPoint(base_point_coords[0], base_point_coords[1])
+    base_point_qrisp = list(base_point_coords)
+    p = curve_params["p"]
+
+    for point in points:
+        P_ell = clECarithm.EllPoint(point[0], point[1])
+        result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
+
+        @qrisp.boolean_simulation
+        def run_addition():
+            anc_0 = qrisp.QuantumModulus(p)
+            anc_0[:] = point[0]
+            anc_1 = qrisp.QuantumModulus(p)
+            anc_1[:] = point[1]
+            qECarithm.qrisp_ell_add_inpl(
+                [anc_0, anc_1], base_point_qrisp, p
+            )
+            return qrisp.measure(anc_0), qrisp.measure(anc_1)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            rx, ry = run_addition()
+
+        faulty = [w for w in caught if "Faulty" in str(w.message)]
+        assert len(faulty) == 0, (
+            f"Faulty uncomputation for point {point}: {[str(w.message) for w in faulty]}"
+        )
+        assert (int(rx), int(ry)) == (result_ell.x, result_ell.y), (
+            f"Dynamic mode mismatch for point {point} on curve a={curve.a}, b={curve.b}, p={p}: "
+            f"got ({int(rx)}, {int(ry)}), expected ({result_ell.x}, {result_ell.y})"
+        )
