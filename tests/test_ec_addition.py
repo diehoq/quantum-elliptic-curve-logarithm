@@ -122,7 +122,6 @@ def test_ec_addition(curve_data):
             (result_ell.x, result_ell.y): 1
         }, f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
 
-@pytest.mark.skip
 @pytest.mark.parametrize("curve_data", curves_with_points)
 def test_ec_addition_dynamic(curve_data):
     """Test EC addition under @boolean_simulation (dynamic/JAX mode)."""
