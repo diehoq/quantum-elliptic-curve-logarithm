@@ -1,0 +1,172 @@
+[
+  {
+    "bit_length": 4,
+    "prime": 13,
+    "curve_order": 7,
+    "subgroup_order": 7,
+    "cofactor": 1,
+    "generator_point": [11, 5],
+    "private_key": 6,
+    "public_key": [11, 8]
+  },
+  {
+    "bit_length": 6,
+    "prime": 43,
+    "curve_order": 31,
+    "subgroup_order": 31,
+    "cofactor": 1,
+    "generator_point": [34, 3],
+    "private_key": 18,
+    "public_key": [21, 25]
+  },
+  {
+    "bit_length": 7,
+    "prime": 67,
+    "curve_order": 79,
+    "subgroup_order": 79,
+    "cofactor": 1,
+    "generator_point": [48, 60],
+    "private_key": 56,
+    "public_key": [52, 7]
+  },
+  {
+    "bit_length": 8,
+    "prime": 163,
+    "curve_order": 139,
+    "subgroup_order": 139,
+    "cofactor": 1,
+    "generator_point": [112, 53],
+    "private_key": 103,
+    "public_key": [122, 144]
+  },
+  {
+    "bit_length": 9,
+    "prime": 349,
+    "curve_order": 313,
+    "subgroup_order": 313,
+    "cofactor": 1,
+    "generator_point": [22, 191],
+    "private_key": 135,
+    "public_key": [138, 315]
+  },
+  {
+    "bit_length": 10,
+    "prime": 547,
+    "curve_order": 547,
+    "subgroup_order": 547,
+    "cofactor": 1,
+    "generator_point": [386, 359],
+    "private_key": 165,
+    "public_key": [286, 462]
+  },
+  {
+    "bit_length": 11,
+    "prime": 1051,
+    "curve_order": 1093,
+    "subgroup_order": 1093,
+    "cofactor": 1,
+    "generator_point": [471, 914],
+    "private_key": 756,
+    "public_key": [179, 86]
+  },
+  {
+    "bit_length": 12,
+    "prime": 2089,
+    "curve_order": 2143,
+    "subgroup_order": 2143,
+    "cofactor": 1,
+    "generator_point": [1417, 50],
+    "private_key": 1384,
+    "public_key": [1043, 1795]
+  },
+  {
+    "bit_length": 13,
+    "prime": 4159,
+    "curve_order": 4243,
+    "subgroup_order": 4243,
+    "cofactor": 1,
+    "generator_point": [3390, 2980],
+    "private_key": 820,
+    "public_key": [3457, 3962]
+  },
+  {
+    "bit_length": 14,
+    "prime": 8209,
+    "curve_order": 8293,
+    "subgroup_order": 8293,
+    "cofactor": 1,
+    "generator_point": [5566, 7],
+    "private_key": 137,
+    "public_key": [2144, 2381]
+  },
+  {
+    "bit_length": 15,
+    "prime": 16477,
+    "curve_order": 16693,
+    "subgroup_order": 16693,
+    "cofactor": 1,
+    "generator_point": [15429, 10667],
+    "private_key": 14794,
+    "public_key": [6884, 12671]
+  },
+  {
+    "bit_length": 16,
+    "prime": 32803,
+    "curve_order": 32497,
+    "subgroup_order": 32497,
+    "cofactor": 1,
+    "generator_point": [14333, 24084],
+    "private_key": 20248,
+    "public_key": [31890, 7753]
+  },
+  {
+    "bit_length": 17,
+    "prime": 65647,
+    "curve_order": 65173,
+    "subgroup_order": 65173,
+    "cofactor": 1,
+    "generator_point": [12976, 52834],
+    "private_key": 1441,
+    "public_key": [477, 58220]
+  },
+  {
+    "bit_length": 18,
+    "prime": 131251,
+    "curve_order": 130579,
+    "subgroup_order": 130579,
+    "cofactor": 1,
+    "generator_point": [66566, 127721],
+    "private_key": 26320,
+    "public_key": [122895, 58382]
+  },
+  {
+    "bit_length": 19,
+    "prime": 262153,
+    "curve_order": 262567,
+    "subgroup_order": 262567,
+    "cofactor": 1,
+    "generator_point": [44507, 141754],
+    "private_key": 36124,
+    "public_key": [253977, 23539]
+  },
+  {
+    "bit_length": 20,
+    "prime": 525043,
+    "curve_order": 524269,
+    "subgroup_order": 524269,
+    "cofactor": 1,
+    "generator_point": [449655, 39077],
+    "private_key": 493247,
+    "public_key": [417592, 204251]
+  },
+  {
+    "bit_length": 21,
+    "prime": 1048783,
+    "curve_order": 1050337,
+    "subgroup_order": 1050337,
+    "cofactor": 1,
+    "generator_point": [231634, 106125],
+    "private_key": 653735,
+    "public_key": [1047961, 428633]
+  }
+]
