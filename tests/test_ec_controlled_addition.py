@@ -1,3 +1,5 @@
+import warnings
+
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
 import qrisp
@@ -10,6 +12,15 @@ G = (3, 5)
 CURVE = clECarithm.EllCurve(a=5, b=4, p=7)
 R = clECarithm.ell_add_generic(
     clECarithm.EllPoint(*P), clECarithm.EllPoint(*G), CURVE
+)
+
+# Boolean simulation tests params:
+P_BS = (0, 2)
+G_BS = (3, 5)
+P_BS_p = 7
+R_BS = clECarithm.ell_add_generic(
+    clECarithm.EllPoint(*P_BS), clECarithm.EllPoint(*G_BS),
+    clECarithm.EllCurve(a=5, b=4, p=P_BS_p),
 )
 
 
@@ -46,4 +57,66 @@ def test_controlled_addition_ctrl_off():
     result = qrisp.multi_measurement([anc_0, anc_1])
     assert result == {(P[0], P[1]): 1}, (
         f"ctrl=0: expected ({P[0]}, {P[1]}), got {result}"
+    )
+
+
+def test_controlled_addition_ctrl_on_boolean_sim():
+    """ctrl=|1> under @boolean_simulation: addition should happen."""
+
+    @qrisp.boolean_simulation
+    def run():
+        ctrl = qrisp.QuantumBool()
+        ctrl[:] = True
+        anc_0 = qrisp.QuantumModulus(P_BS_p)
+        anc_0[:] = P_BS[0]
+        anc_1 = qrisp.QuantumModulus(P_BS_p)
+        anc_1[:] = P_BS[1]
+
+        with qrisp.control(ctrl):
+            qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G_BS), P_BS_p)
+
+        return qrisp.measure(anc_0), qrisp.measure(anc_1)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        rx, ry = run()
+
+    faulty = [w for w in caught if "Faulty" in str(w.message)]
+    assert len(faulty) == 0, (
+        f"Faulty uncomputation warnings: {[str(w.message) for w in faulty]}"
+    )
+    assert (int(rx), int(ry)) == (R_BS.x, R_BS.y), (
+        f"ctrl=1 boolean_sim: got ({int(rx)}, {int(ry)}), "
+        f"expected ({R_BS.x}, {R_BS.y})"
+    )
+
+
+def test_controlled_addition_ctrl_off_boolean_sim():
+    """ctrl=|0> under @boolean_simulation: result should be P unchanged."""
+
+    @qrisp.boolean_simulation
+    def run():
+        ctrl = qrisp.QuantumBool()
+        ctrl[:] = False
+        anc_0 = qrisp.QuantumModulus(P_BS_p)
+        anc_0[:] = P_BS[0]
+        anc_1 = qrisp.QuantumModulus(P_BS_p)
+        anc_1[:] = P_BS[1]
+
+        with qrisp.control(ctrl):
+            qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G_BS), P_BS_p)
+
+        return qrisp.measure(anc_0), qrisp.measure(anc_1)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        rx, ry = run()
+
+    faulty = [w for w in caught if "Faulty" in str(w.message)]
+    assert len(faulty) == 0, (
+        f"Faulty uncomputation warnings: {[str(w.message) for w in faulty]}"
+    )
+    assert (int(rx), int(ry)) == (P_BS[0], P_BS[1]), (
+        f"ctrl=0 boolean_sim: got ({int(rx)}, {int(ry)}), "
+        f"expected ({P_BS[0]}, {P_BS[1]})"
     )
