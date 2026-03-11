@@ -284,7 +284,7 @@ def q_ec_mult_add(power, res, k, curve):
     p = curve.p
     merge([res, k])
 
-    for i in range(n):
+    for i in jrange(n):
         with control(k[i]):
             q_ec_add_inpl(res, power, p)
         # with invert():
