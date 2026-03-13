@@ -118,12 +118,23 @@ def test_classical_verify(entry):
 # Tier 2 — Resource estimation (circuit build + compile, no simulation)
 #
 # Extend _RESOURCE_BIT_LENGTHS as hardware/time budget allows.
+# Results are appended to resource_estimation.json after each curve.
 # ---------------------------------------------------------------------------
-_RESOURCE_BIT_LENGTHS = [4, 6, 7, 8]
+_resource_entries = CURVES_AND_KEYS
 
-_resource_entries = [
-    e for e in CURVES_AND_KEYS if e["bit_length"] in _RESOURCE_BIT_LENGTHS
-]
+_RESULTS_JSON = os.path.join(_HERE, os.pardir, "resource_estimation.json")
+
+
+def _load_results():
+    if os.path.exists(_RESULTS_JSON):
+        with open(_RESULTS_JSON) as f:
+            return json.load(f)
+    return {}
+
+
+def _save_results(results):
+    with open(_RESULTS_JSON, "w") as f:
+        json.dump(results, f, indent=2)
 
 
 @pytest.mark.parametrize(
@@ -136,6 +147,16 @@ def test_resource_estimation(entry):
 
     assert metrics["qubit_count"] > 0
     assert metrics["t_count"] >= 0
+
+    # Persist to JSON log
+    results = _load_results()
+    key = f"{entry['bit_length']}bit_p{entry['prime']}"
+    results[key] = {
+        "bit_length": entry["bit_length"],
+        "prime": entry["prime"],
+        **metrics,
+    }
+    _save_results(results)
 
     print(
         f"\n  {entry['bit_length']}-bit (p={entry['prime']}): "
