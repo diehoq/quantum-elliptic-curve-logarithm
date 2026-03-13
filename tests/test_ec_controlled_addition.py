@@ -120,3 +120,27 @@ def test_controlled_addition_ctrl_off_boolean_sim():
         f"ctrl=0 boolean_sim: got ({int(rx)}, {int(ry)}), "
         f"expected ({P_BS[0]}, {P_BS[1]})"
     )
+
+
+def test_controlled_addition_ctrl_superposition():
+    """ctrl in superposition |0>+|1>: should get both P and P+G outcomes."""
+    ctrl = qrisp.QuantumBool()
+    qrisp.h(ctrl)
+
+    anc_0 = qrisp.QuantumModulus(CURVE.p)
+    anc_0[:] = P[0]
+    anc_1 = qrisp.QuantumModulus(CURVE.p)
+    anc_1[:] = P[1]
+
+    with qrisp.control(ctrl):
+        qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G), CURVE.p)
+
+    results = qrisp.multi_measurement([ctrl, anc_0, anc_1])
+    # ctrl=False → P unchanged, ctrl=True → P+G
+    assert (False, P[0], P[1]) in results, (
+        f"Missing ctrl=0 outcome (P unchanged): {results}"
+    )
+    assert (True, R.x, R.y) in results, (
+        f"Missing ctrl=1 outcome (P+G): {results}"
+    )
+    assert len(results) == 2, f"Expected 2 outcomes, got {len(results)}: {results}"

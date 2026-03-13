@@ -51,3 +51,23 @@ def test_kaliski_mod_inv_dynamic(v_cl, p):
     
     result = main(v_cl)
     assert result == expected_inverse, f"Quantum inverse {result} did not match expected {expected_inverse} for v={v_cl}, p={p}"
+
+
+@pytest.mark.parametrize("p", primes)
+def test_kaliski_mod_inv_superposition(p):
+    """Put v in a uniform superposition of all non-zero residues and verify
+    that every measured outcome is the correct modular inverse."""
+    v = qrisp.QuantumModulus(p)
+    m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
+
+    # Prepare superposition of 1..p-1
+    for val in range(1, p):
+        v[{val: 1}] = True  # encode via dict init
+
+    qECarithm.kaliski_mod_inv(v, p, m)
+
+    results = v.get_measurement()
+    expected = {pow(val, -1, p) for val in range(1, p)}
+    assert set(results.keys()) == expected, (
+        f"p={p}: outcomes {set(results.keys())} != expected inverses {expected}"
+    )

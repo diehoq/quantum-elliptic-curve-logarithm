@@ -38,3 +38,34 @@ def test_ell_mult_add(k_val, n_bits):
     assert meas == {(expected.x, expected.y): 1}, (
         f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), got {meas}"
     )
+
+
+def test_ell_mult_add_k_superposition():
+    """Put k in superposition |1>+|2> (2 bits) and verify both Q+1*P and Q+2*P appear."""
+    p = CURVE.p
+
+    expected_1 = clECarithm.ell_mult_add(
+        clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), 1, CURVE
+    )
+    expected_2 = clECarithm.ell_mult_add(
+        clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), 2, CURVE
+    )
+
+    res_0 = qrisp.QuantumModulus(p)
+    res_0[:] = Q[0]
+    res_1 = qrisp.QuantumModulus(p)
+    res_1[:] = Q[1]
+
+    k = qrisp.QuantumFloat(2)
+    k[:] = {1: 1, 2: 1}  # superposition of k=1 and k=2
+
+    result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE)
+
+    meas = qrisp.multi_measurement([result[0], result[1]])
+    assert (expected_1.x, expected_1.y) in meas, (
+        f"Missing Q+1*P=({expected_1.x},{expected_1.y}), got {meas}"
+    )
+    assert (expected_2.x, expected_2.y) in meas, (
+        f"Missing Q+2*P=({expected_2.x},{expected_2.y}), got {meas}"
+    )
+    assert len(meas) == 2, f"Expected 2 outcomes, got {len(meas)}: {meas}"

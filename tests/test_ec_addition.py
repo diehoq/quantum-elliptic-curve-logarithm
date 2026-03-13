@@ -123,6 +123,45 @@ def test_ec_addition(curve_data):
         }, f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
 
 @pytest.mark.parametrize("curve_data", curves_with_points)
+def test_ec_addition_superposition(curve_data):
+    """Put the input point in a superposition of two curve points and verify
+    that both addition results appear in the measurement outcomes."""
+    curve_params = curve_data["curve_params"]
+    points = curve_data["points"]
+    base_point_coords = curve_data["base_point"]
+    p = curve_params["p"]
+
+    curve = clECarithm.EllCurve(
+        a=curve_params["a"], b=curve_params["b"], p=p
+    )
+    base_point_ell = clECarithm.EllPoint(*base_point_coords)
+    base_point_qrisp = list(base_point_coords)
+
+    # Pick the first two points for the superposition
+    p0, p1 = points[0], points[1]
+    r0 = clECarithm.ell_add_generic(clECarithm.EllPoint(*p0), base_point_ell, curve)
+    r1 = clECarithm.ell_add_generic(clECarithm.EllPoint(*p1), base_point_ell, curve)
+
+    anc_0 = qrisp.QuantumModulus(p)
+    anc_1 = qrisp.QuantumModulus(p)
+
+    # Prepare superposition: |p0> + |p1>
+    anc_0[:] = {p0[0]: 1, p1[0]: 1}
+    anc_1[:] = {p0[1]: 1, p1[1]: 1}
+
+    qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, p)
+
+    results = qrisp.multi_measurement([anc_0, anc_1])
+    assert (r0.x, r0.y) in results, (
+        f"Missing result for {p0}+G: expected ({r0.x},{r0.y}), got {results}"
+    )
+    assert (r1.x, r1.y) in results, (
+        f"Missing result for {p1}+G: expected ({r1.x},{r1.y}), got {results}"
+    )
+    assert len(results) == 2, f"Expected 2 outcomes, got {len(results)}: {results}"
+
+
+@pytest.mark.parametrize("curve_data", curves_with_points)
 def test_ec_addition_dynamic(curve_data):
     """Test EC addition under @boolean_simulation (dynamic/JAX mode)."""
     import warnings
