@@ -9,6 +9,7 @@ Tier 2 — Resource estimation: build the Shor circuit and compile it to
          extract qubit count, T-count, CNOT count, and T-depth.
          No simulation is needed — compilation alone is the proof of work.
 Tier 3 — Functional simulation: run Shor end-to-end on the 4-bit curve.
+Tier 4 — JASP simulation: run the same 4-bit instance through @jaspify.
 """
 import json
 import os
@@ -86,6 +87,31 @@ def _compile_and_measure(anc):
     }
 
 
+def _recover_discrete_logs(outcomes, G, P, curve, order):
+    """Recover valid discrete-log candidates from measurement outcomes."""
+    G_pt = clECarithm.EllPoint(*G)
+    P_pt = clECarithm.EllPoint(*P)
+    recovered = set()
+
+    for a_val, b_val in outcomes:
+        a_val = int(a_val)
+        b_val = int(b_val)
+        if b_val % order == 0:
+            continue
+        try:
+            k_candidate = (-a_val * pow(b_val, -1, order)) % order
+        except (ValueError, ZeroDivisionError):
+            continue
+
+        check = G_pt
+        for _ in range(k_candidate - 1):
+            check = clECarithm.ell_add(check, G_pt, curve)
+        if (check.x, check.y) == (P_pt.x, P_pt.y):
+            recovered.add(k_candidate)
+
+    return recovered
+
+
 # ---------------------------------------------------------------------------
 # Tier 1 — Classical verification (all 17 curves)
 # ---------------------------------------------------------------------------
@@ -133,8 +159,23 @@ def _load_results():
 
 
 def _save_results(results):
-    with open(_RESULTS_JSON, "w") as f:
+    os.makedirs(os.path.dirname(_RESULTS_JSON), exist_ok=True)
+    tmp_json = f"{_RESULTS_JSON}.tmp"
+    with open(tmp_json, "w") as f:
         json.dump(results, f, indent=2)
+    os.replace(tmp_json, _RESULTS_JSON)
+
+
+def _record_metrics(entry, metrics):
+    """Persist compiled resource metrics for a single curve entry."""
+    results = _load_results()
+    key = f"{entry['bit_length']}bit_p{entry['prime']}"
+    results[key] = {
+        "bit_length": entry["bit_length"],
+        "prime": entry["prime"],
+        **metrics,
+    }
+    _save_results(results)
 
 
 @pytest.mark.parametrize(
@@ -144,19 +185,10 @@ def test_resource_estimation(entry):
     """Build and compile the full Shor circuit; report resource metrics."""
     anc, x1, x2 = _build_shor_circuit(entry)
     metrics = _compile_and_measure(anc)
+    _record_metrics(entry, metrics)
 
     assert metrics["qubit_count"] > 0
     assert metrics["t_count"] >= 0
-
-    # Persist to JSON log
-    results = _load_results()
-    key = f"{entry['bit_length']}bit_p{entry['prime']}"
-    results[key] = {
-        "bit_length": entry["bit_length"],
-        "prime": entry["prime"],
-        **metrics,
-    }
-    _save_results(results)
 
     print(
         f"\n  {entry['bit_length']}-bit (p={entry['prime']}): "
@@ -170,6 +202,7 @@ def test_resource_estimation(entry):
 # ---------------------------------------------------------------------------
 # Tier 3 — Full simulation (4-bit curve only)
 # ---------------------------------------------------------------------------
+@pytest.mark.timeout(7200)
 def test_shor_simulation_4bit():
     """Simulate Shor's algorithm on the 4-bit curve and recover the key."""
     entry = next(e for e in CURVES_AND_KEYS if e["bit_length"] == 4)
@@ -198,27 +231,56 @@ def test_shor_simulation_4bit():
     qrisp.QFT(x2, inv=True)
 
     results = qrisp.multi_measurement([x1, x2])
-
-    # Extract discrete log from measurement outcomes:
-    # For each (a, b) with b != 0 mod order: k = -a·b⁻¹ mod order
-    G_pt = clECarithm.EllPoint(*G)
-    P_pt = clECarithm.EllPoint(*P)
-    recovered = set()
-    for (a_val, b_val), _ in results.items():
-        if b_val % order == 0:
-            continue
-        try:
-            k_candidate = (-a_val * pow(b_val, -1, order)) % order
-        except (ValueError, ZeroDivisionError):
-            continue
-        # Verify classically
-        check = G_pt
-        for _ in range(k_candidate - 1):
-            check = clECarithm.ell_add(check, G_pt, curve)
-        if (check.x, check.y) == (P_pt.x, P_pt.y):
-            recovered.add(k_candidate)
+    recovered = _recover_discrete_logs(results.keys(), G, P, curve, order)
 
     assert expected_k in recovered, (
         f"Failed to recover k={expected_k}. "
         f"Candidates: {recovered}, outcomes: {results}"
+    )
+
+
+@pytest.mark.timeout(7200)
+def test_shor_simulation_4bit_jaspify():
+    """Run the 4-bit Shor instance through @jaspify and recover the key."""
+    entry = next(e for e in CURVES_AND_KEYS if e["bit_length"] == 4)
+    p = entry["prime"]
+    curve = clECarithm.EllCurve(A, B, p)
+    G = list(entry["generator_point"])
+    P = list(entry["public_key"])
+    expected_k = entry["private_key"]
+    order = entry["subgroup_order"]
+    shots = 256
+
+    @qrisp.jaspify
+    def run_shor_jasp():
+        def state_prep():
+            local_curve = clECarithm.EllCurve(A, B, p)
+            n_bits = p.bit_length()
+            x1 = qrisp.QuantumModulus(2**n_bits)
+            x2 = qrisp.QuantumModulus(2**n_bits)
+
+            mod_p = qrisp.QuantumModulus(p)
+            anc = qrisp.QuantumArray(qtype=mod_p, shape=(2,))
+            anc[:] = G
+
+            qrisp.h(x1)
+            qrisp.h(x2)
+
+            anc = qECarithm.q_ec_mult_add(G, anc, x1, local_curve)
+            anc = qECarithm.q_ec_mult_add(P, anc, x2, local_curve)
+
+            qrisp.QFT(x1, inv=True)
+            qrisp.QFT(x2, inv=True)
+            return x1, x2
+
+        sampler = qrisp.sample(state_prep, shots=shots)
+        return sampler()
+
+    samples = run_shor_jasp()
+    outcomes = [tuple(int(value) for value in sample) for sample in samples.tolist()]
+    recovered = _recover_discrete_logs(outcomes, G, P, curve, order)
+
+    assert expected_k in recovered, (
+        f"Failed to recover k={expected_k} with @jaspify. "
+        f"Candidates: {recovered}, samples: {outcomes[:20]}"
     )
