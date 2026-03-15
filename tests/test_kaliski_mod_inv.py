@@ -1,7 +1,7 @@
 import src.quantum.ec_arithmetic as qECarithm
 import pytest
 import qrisp
-from qrisp import measure, QuantumModulus, QuantumArray, QuantumBool,boolean_simulation, jaspify
+from qrisp import h, measure, QuantumModulus, QuantumArray, QuantumBool,boolean_simulation, jaspify
 
 
 
@@ -60,13 +60,12 @@ def test_kaliski_mod_inv_superposition(p):
     m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
 
     # Prepare superposition of 1..p-1
-    for val in range(1, p):
-        v[{val: 1}] = True  # encode via dict init
-
+    h(v)
+    
     qECarithm.kaliski_mod_inv(v, p, m)
 
     results = v.get_measurement()
-    expected = {pow(val, -1, p) for val in range(1, p)}
+    expected = {pow(val, -1, p) for val in range(1, p)} | {0}
     assert set(results.keys()) == expected, (
         f"p={p}: outcomes {set(results.keys())} != expected inverses {expected}"
     )
