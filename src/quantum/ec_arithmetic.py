@@ -133,12 +133,36 @@ def kaliski_mod_inv(v, p, m):
     add.delete()
     b.delete()
 
+    # Fix for v=0 input (phase 1): the loop is a no-op, leaving
+    # u=p, v=0, r=0, s=1.  Detect via u==p (u=1 for all v!=0)
+    # and neutralise r so that inpl_rsub(p,p)=0, keeping v=0 after swap.
+    v_was_zero = QuantumBool()
+    eq_u_p = v_was_zero << (lambda a, b: a == b)
+    with conjugate(eq_u_p)(u, p):
+        with control(v_was_zero):
+            r += p
+    v_was_zero.delete()
+
     inpl_rsub(r, p)
 
     for i in jrange(v.size):
         swap(v[i], r[i])
 
-    # # Uncompute u,s,f
+    # Fix for v=0 input (phase 2): after phase 1, v=0 uniquely identifies
+    # the original-v=0 case (v!=0 always lands in [1,p-1]).
+    # Cleanup expects u=1, s=p but we still have u=p, s=1.  XOR-correct.
+    v_was_zero = QuantumBool()
+    eq_v_0 = v_was_zero << (lambda a, b: a == b)
+    with conjugate(eq_v_0)(v, 0):
+        with control(v_was_zero):
+            correction = p ^ 1
+            for i in range(n):
+                if (correction >> i) & 1:
+                    x(u[i])
+                    x(s[i])
+    v_was_zero.delete()
+
+    # Uncompute u,s,f
     f.delete()
     x(u[0])
     u.delete()
