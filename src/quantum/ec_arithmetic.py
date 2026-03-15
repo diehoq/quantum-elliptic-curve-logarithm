@@ -15,13 +15,15 @@ from qrisp import (
     merge,
     singular_shift,
     custom_control,
-    qache 
+    qache,
 )
+
 
 def to_montgomery(x, p):
     n = p.bit_length()
     x *= 2**n % p
     return x
+
 
 def to_standard(x, p):
     n = p.bit_length()
@@ -30,14 +32,14 @@ def to_standard(x, p):
 
 
 def to_montgomery_qm(x, montgomery_shift):
-    
-    #N = int(x.modulus)
+
+    # N = int(x.modulus)
     R_mod_N = pow(2, montgomery_shift)
-    x*=R_mod_N
-    
+    x *= R_mod_N
+
     x.m = montgomery_shift
 
-    
+
 def to_standard_qm(x):
     montgomery_shift = x.m
     x *= pow(2, -montgomery_shift, x.modulus)
@@ -57,7 +59,7 @@ def inpl_rsub(r, p):
 def kaliski_mod_inv(v, p, m):
     n = p.bit_length()
     # Convert to Montgomery
-    to_montgomery(v, p) 
+    to_montgomery(v, p)
     u = QuantumFloat(n)
     u[:] = p
     r = QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
@@ -199,7 +201,7 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
     # Precompute constants for manual to_standard / to_montgomery.
     # conjugate(to_standard_qm) has a faulty-uncomputation bug under
     # boolean_simulation, so we apply the conversion manually.
-    fwd_const = pow(2, m_red, p)   # to_standard multiplier
+    fwd_const = pow(2, m_red, p)  # to_standard multiplier
     rev_const = pow(2, -m_red, p)  # to_montgomery multiplier (inverse)
 
     if ctrl is None:
@@ -311,7 +313,6 @@ def q_ec_mult_add(power, res, k, curve):
     for i in jrange(n):
         with control(k[i]):
             q_ec_add_inpl(res, power, p)
-        # with invert():
-        # cyclic_shift(k)
+
         power = q_ec_double(power, curve)
     return res
