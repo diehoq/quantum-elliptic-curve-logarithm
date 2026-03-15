@@ -48,9 +48,28 @@ def to_standard_qm(x):
 
 # Consider moving this function to qrisp source code
 def inpl_rsub(r, p):
-    x(r)
-    r.inpl_adder(r.modulus + 1, r)
-    r += p
+    # Compute r := (p - r) mod p.
+    # The bit-trick (NOT + add modulus+1 + modular-add p) creates intermediate
+    # value == modulus when r=0, which breaks mod_adder (its ancilla can't
+    # uncompute because a=0 makes forward/reverse additions all no-ops).
+    # This only matters when p % r.modulus == 0 (i.e. modulus == p), because
+    # then __iadd__ pre-reduces p to 0 and mod_adder receives a=0.
+    # For modulus == 2p, the add is non-degenerate and mod_adder works fine.
+    if p % int(r.modulus) == 0:
+        # r += p reduces to mod_adder(0,...) which faults on value=modulus.
+        # Fix: skip when r=0 (it's a no-op since (p-0) mod p = 0).
+        is_zero = QuantumBool()
+        eq = is_zero << (lambda a, b: a == b)
+        with conjugate(eq)(r, 0):
+            with control(is_zero, ctrl_state="0"):
+                x(r)
+                r.inpl_adder(r.modulus + 1, r)
+                r += p
+        is_zero.delete()
+    else:
+        x(r)
+        r.inpl_adder(r.modulus + 1, r)
+        r += p
 
 
 # Consider moving this function to qrisp source code
