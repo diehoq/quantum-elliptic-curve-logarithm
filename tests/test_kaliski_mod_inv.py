@@ -28,7 +28,6 @@ def test_kaliski_mod_inv(v_cl, p):
         expected_inverse: 1
     }, f"Quantum inverse did not match expected {expected_inverse} for v_cl={v_cl}, p={p}"
 
-@pytest.mark.skip
 @pytest.mark.parametrize("v_cl", range(1, 23))
 @pytest.mark.parametrize("p", primes)
 def test_kaliski_mod_inv_dynamic(v_cl, p):

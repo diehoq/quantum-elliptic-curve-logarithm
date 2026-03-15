@@ -160,8 +160,6 @@ def test_ec_addition_superposition(curve_data):
     )
     assert len(results) == 2, f"Expected 2 outcomes, got {len(results)}: {results}"
 
-
-@pytest.mark.skip
 @pytest.mark.parametrize("curve_data", curves_with_points)
 def test_ec_addition_dynamic(curve_data):
     """Test EC addition under @boolean_simulation (dynamic/JAX mode)."""

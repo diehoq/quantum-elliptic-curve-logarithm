@@ -59,7 +59,6 @@ def test_controlled_addition_ctrl_off():
         f"ctrl=0: expected ({P[0]}, {P[1]}), got {result}"
     )
 
-@pytest.mark.skip
 def test_controlled_addition_ctrl_on_boolean_sim():
     """ctrl=|1> under @boolean_simulation: addition should happen."""
 
@@ -90,7 +89,6 @@ def test_controlled_addition_ctrl_on_boolean_sim():
         f"expected ({R_BS.x}, {R_BS.y})"
     )
 
-@pytest.mark.skip
 def test_controlled_addition_ctrl_off_boolean_sim():
     """ctrl=|0> under @boolean_simulation: result should be P unchanged."""
 
