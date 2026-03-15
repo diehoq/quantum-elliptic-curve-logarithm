@@ -1,7 +1,8 @@
-import src.classical.ec_arithmetic as clECarithm
-import src.quantum.ec_arithmetic as qECarithm
 import qrisp
 import pytest
+import src.classical.ec_arithmetic as clECarithm
+import src.quantum.ec_arithmetic as qECarithm
+import warnings
 
 
 # Curve: y² = x³ + 5x + 4 mod 7
@@ -37,6 +38,48 @@ def test_ell_mult_add(k_val, n_bits):
     meas = qrisp.multi_measurement([result[0], result[1]])
     assert meas == {(expected.x, expected.y): 1}, (
         f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), got {meas}"
+    )
+
+
+@pytest.mark.parametrize("k_val,n_bits", [
+    (1, 1),
+    (1, 2),
+    (2, 2),
+    (3, 2),
+])
+def test_ell_mult_add_dynamic(k_val, n_bits):
+    """Test Q + k*P under @boolean_simulation for small k values."""
+    p = CURVE.p
+
+    expected = clECarithm.ell_mult_add(
+        clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), k_val, CURVE
+    )
+
+    @qrisp.boolean_simulation
+    def run_mult_add():
+        res_0 = qrisp.QuantumModulus(p)
+        res_0[:] = Q[0]
+        res_1 = qrisp.QuantumModulus(p)
+        res_1[:] = Q[1]
+
+        k = qrisp.QuantumFloat(n_bits)
+        k[:] = k_val
+
+        result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE)
+        return qrisp.measure(result[0]), qrisp.measure(result[1])
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        rx, ry = run_mult_add()
+
+    faulty = [w for w in caught if "Faulty" in str(w.message)]
+    assert len(faulty) == 0, (
+        f"Faulty uncomputation warnings for k={k_val}, n_bits={n_bits}: "
+        f"{[str(w.message) for w in faulty]}"
+    )
+    assert (int(rx), int(ry)) == (expected.x, expected.y), (
+        f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), "
+        f"got ({int(rx)}, {int(ry)})"
     )
 
 
