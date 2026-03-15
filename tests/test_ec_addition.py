@@ -4,11 +4,11 @@ import qrisp
 import pytest
 
 curves_with_points = [
-    # {
-    #     "curve_params": {"a": 0, "b": 3, "p": 5},
-    #     "points": [(2, 1), (3, 0), (2, 4)],
-    #     "base_point": (1, 2),
-    # },
+    {
+        "curve_params": {"a": 0, "b": 3, "p": 5},
+        "points": [(2, 1), (3, 0), (2, 4)],
+        "base_point": (1, 2),
+    },
     # NOTICE: A CHAIN SHOULD BE CHOSEN FOR EACH CURVE BEFORE LAUNCHING THE TESTS
     {
         "curve_params": {"a": 5, "b": 4, "p": 7},
@@ -22,33 +22,33 @@ curves_with_points = [
         ],
         "base_point": (3, 5),
     },
-    # {
-    #     "curve_params": {"a": 1, "b": 6, "p": 11},
-    #     "points": [(2, 4), (2, 7), (5, 2), (7, 2), (7, 9), (8, 3), (10, 2)],
-    #     "base_point": (5, 2),
-    # },
-    # {
-    #     "curve_params": {"a": 2, "b": 3, "p": 13},
-    #     "points": [
-    #         (0, 4),
-    #         (0, 9),
-    #         (3, 6),
-    #         (3, 7),
-    #         (4, 6),
-    #         (4, 7),
-    #         (6, 6),
-    #         (6, 7),
-    #         (7, 3),
-    #         (7, 10),
-    #         (9, 3),
-    #         (9, 10),
-    #         (10, 3),
-    #         (10, 10),
-    #         (11, 2),
-    #         (11, 11),
-    #     ],
-    #     "base_point": (3, 6),
-    # },
+    {
+        "curve_params": {"a": 1, "b": 6, "p": 11},
+        "points": [(2, 4), (2, 7), (5, 2), (7, 2), (7, 9), (8, 3), (10, 2)],
+        "base_point": (5, 2),
+    },
+    {
+        "curve_params": {"a": 2, "b": 3, "p": 13},
+        "points": [
+            (0, 4),
+            (0, 9),
+            (3, 6),
+            (3, 7),
+            (4, 6),
+            (4, 7),
+            (6, 6),
+            (6, 7),
+            (7, 3),
+            (7, 10),
+            (9, 3),
+            (9, 10),
+            (10, 3),
+            (10, 10),
+            (11, 2),
+            (11, 11),
+        ],
+        "base_point": (3, 6),
+    },
     # {
     #     "curve_params": {"a": 1, "b": 5, "p": 17},
     #     "points": [
@@ -114,13 +114,12 @@ def test_ec_addition(curve_data):
         anc_1[:] = point[1]
 
         result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
-        qECarithm.q_ec_add_inpl(
-            [anc_0, anc_1], base_point_qrisp, curve_params["p"]
-        )
+        qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, curve_params["p"])
 
         assert qrisp.multi_measurement([anc_0, anc_1]) == {
             (result_ell.x, result_ell.y): 1
         }, f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
+
 
 @pytest.mark.parametrize("curve_data", curves_with_points)
 def test_ec_addition_superposition(curve_data):
@@ -131,9 +130,7 @@ def test_ec_addition_superposition(curve_data):
     base_point_coords = curve_data["base_point"]
     p = curve_params["p"]
 
-    curve = clECarithm.EllCurve(
-        a=curve_params["a"], b=curve_params["b"], p=p
-    )
+    curve = clECarithm.EllCurve(a=curve_params["a"], b=curve_params["b"], p=p)
     base_point_ell = clECarithm.EllPoint(*base_point_coords)
     base_point_qrisp = list(base_point_coords)
 
@@ -152,13 +149,16 @@ def test_ec_addition_superposition(curve_data):
     qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, p)
 
     results = qrisp.multi_measurement([anc_0, anc_1])
-    assert (r0.x, r0.y) in results, (
-        f"Missing result for {p0}+G: expected ({r0.x},{r0.y}), got {results}"
-    )
-    assert (r1.x, r1.y) in results, (
-        f"Missing result for {p1}+G: expected ({r1.x},{r1.y}), got {results}"
-    )
+    assert (
+        r0.x,
+        r0.y,
+    ) in results, f"Missing result for {p0}+G: expected ({r0.x},{r0.y}), got {results}"
+    assert (
+        r1.x,
+        r1.y,
+    ) in results, f"Missing result for {p1}+G: expected ({r1.x},{r1.y}), got {results}"
     assert len(results) == 2, f"Expected 2 outcomes, got {len(results)}: {results}"
+
 
 @pytest.mark.parametrize("curve_data", curves_with_points)
 def test_ec_addition_dynamic(curve_data):
@@ -187,9 +187,7 @@ def test_ec_addition_dynamic(curve_data):
             anc_0[:] = point[0]
             anc_1 = qrisp.QuantumModulus(p)
             anc_1[:] = point[1]
-            qECarithm.q_ec_add_inpl(
-                [anc_0, anc_1], base_point_qrisp, p
-            )
+            qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, p)
             return qrisp.measure(anc_0), qrisp.measure(anc_1)
 
         with warnings.catch_warnings(record=True) as caught:
@@ -197,9 +195,9 @@ def test_ec_addition_dynamic(curve_data):
             rx, ry = run_addition()
 
         faulty = [w for w in caught if "Faulty" in str(w.message)]
-        assert len(faulty) == 0, (
-            f"Faulty uncomputation for point {point}: {[str(w.message) for w in faulty]}"
-        )
+        assert (
+            len(faulty) == 0
+        ), f"Faulty uncomputation for point {point}: {[str(w.message) for w in faulty]}"
         assert (int(rx), int(ry)) == (result_ell.x, result_ell.y), (
             f"Dynamic mode mismatch for point {point} on curve a={curve.a}, b={curve.b}, p={p}: "
             f"got ({int(rx)}, {int(ry)}), expected ({result_ell.x}, {result_ell.y})"

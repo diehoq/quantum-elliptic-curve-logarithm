@@ -5,8 +5,7 @@ from qrisp import h, measure, QuantumModulus, QuantumArray, QuantumBool,boolean_
 
 
 
-primes = [3, 5, 7]  #11 , 13, 17, 19, 23]
-
+primes = [3, 5, 7, 11, 13, 17, 19, 23]
 
 @pytest.mark.parametrize("v_cl", range(1, 23))
 @pytest.mark.parametrize("p", primes)
@@ -52,7 +51,7 @@ def test_kaliski_mod_inv_dynamic(v_cl, p):
     assert result == expected_inverse, f"Quantum inverse {result} did not match expected {expected_inverse} for v={v_cl}, p={p}"
 
 
-@pytest.mark.parametrize("p", primes)
+@pytest.mark.parametrize("p", primes[:5])
 def test_kaliski_mod_inv_superposition(p):
     """Put v in a uniform superposition of all non-zero residues and verify
     that every measured outcome is the correct modular inverse."""
