@@ -1,7 +1,7 @@
 import src.quantum.ec_arithmetic as qECarithm
 import pytest
 import qrisp
-from qrisp import h, measure, QuantumModulus, QuantumArray, QuantumBool,boolean_simulation, jaspify
+from qrisp import measure, QuantumModulus, QuantumArray, QuantumBool, boolean_simulation
 
 
 
@@ -53,18 +53,25 @@ def test_kaliski_mod_inv_dynamic(v_cl, p):
 
 @pytest.mark.parametrize("p", primes[:5])
 def test_kaliski_mod_inv_superposition(p):
-    """Put v in a uniform superposition of all non-zero residues and verify
-    that every measured outcome is the correct modular inverse."""
+    """Prepare an equal superposition over all allowed inputs and verify
+    that modular inversion preserves the uniform distribution."""
     v = qrisp.QuantumModulus(p)
     m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
 
-    # Prepare superposition of 1..p-1
-    h(v)
-    
+    allowed_inputs = range(1, p)
+    v[:] = {value: 1 for value in allowed_inputs}
+
     qECarithm.kaliski_mod_inv(v, p, m)
 
     results = v.get_measurement()
-    expected = {pow(val, -1, p) for val in range(1, p)} | {0}
-    assert set(results.keys()) == expected, (
-        f"p={p}: outcomes {set(results.keys())} != expected inverses {expected}"
+    expected_outputs = {pow(value, -1, p) for value in allowed_inputs}
+    expected_probability = 1 / (p - 1)
+
+    assert set(results.keys()) == expected_outputs, (
+        f"p={p}: outcomes {set(results.keys())} != expected inverses {expected_outputs}"
     )
+    for value in expected_outputs:
+        assert results[value] == pytest.approx(expected_probability, abs=1e-6), (
+            f"p={p}: output {value} had probability {results[value]}, "
+            f"expected {expected_probability}"
+        )
