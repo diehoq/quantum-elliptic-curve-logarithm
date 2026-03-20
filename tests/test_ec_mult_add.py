@@ -41,50 +41,50 @@ def test_ell_mult_add(k_val, n_bits):
     )
 
 
-@pytest.mark.parametrize("k_val,n_bits", [
-    (1, 1),
-    (1, 2),
-    (2, 2),
-    (3, 2),
-])
-def test_ell_mult_add_dynamic(k_val, n_bits):
-    """Test Q + k*P under @boolean_simulation for small k values."""
+def test_ell_mult_add_dynamic():
+    """Test Q + k*P under @boolean_simulation while reusing cached circuits."""
     p = CURVE.p
+    cases_by_n_bits = {
+        1: [1],
+        2: [1, 2, 3],
+    }
 
-    expected = clECarithm.ell_mult_add(
-        clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), k_val, CURVE
-    )
+    for n_bits, k_values in cases_by_n_bits.items():
+        @qrisp.boolean_simulation
+        def run_mult_add(k_val):
+            res_0 = qrisp.QuantumModulus(p)
+            res_0[:] = Q[0]
+            res_1 = qrisp.QuantumModulus(p)
+            res_1[:] = Q[1]
 
-    @qrisp.boolean_simulation
-    def run_mult_add():
-        res_0 = qrisp.QuantumModulus(p)
-        res_0[:] = Q[0]
-        res_1 = qrisp.QuantumModulus(p)
-        res_1[:] = Q[1]
+            k = qrisp.QuantumFloat(n_bits)
+            k[:] = k_val
 
-        k = qrisp.QuantumFloat(n_bits)
-        k[:] = k_val
+            result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE)
+            return qrisp.measure(result[0]), qrisp.measure(result[1])
 
-        result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE)
-        return qrisp.measure(result[0]), qrisp.measure(result[1])
+        for k_val in k_values:
+            expected = clECarithm.ell_mult_add(
+                clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), k_val, CURVE
+            )
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        rx, ry = run_mult_add()
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                rx, ry = run_mult_add(k_val)
 
-    faulty = [w for w in caught if "Faulty" in str(w.message)]
-    assert len(faulty) == 0, (
-        f"Faulty uncomputation warnings for k={k_val}, n_bits={n_bits}: "
-        f"{[str(w.message) for w in faulty]}"
-    )
-    assert (int(rx), int(ry)) == (expected.x, expected.y), (
-        f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), "
-        f"got ({int(rx)}, {int(ry)})"
-    )
+            faulty = [w for w in caught if "Faulty" in str(w.message)]
+            assert len(faulty) == 0, (
+                f"Faulty uncomputation warnings for k={k_val}, n_bits={n_bits}: "
+                f"{[str(w.message) for w in faulty]}"
+            )
+            assert (int(rx), int(ry)) == (expected.x, expected.y), (
+                f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), "
+                f"got ({int(rx)}, {int(ry)})"
+            )
 
 
 def test_ell_mult_add_k_superposition():
-    """Put k in superposition |1>+|2> (2 bits) and verify both Q+1*P and Q+2*P appear."""
+    """Put k in an equal superposition of |1> and |2> and verify both outcomes."""
     p = CURVE.p
 
     expected_1 = clECarithm.ell_mult_add(
@@ -100,15 +100,24 @@ def test_ell_mult_add_k_superposition():
     res_1[:] = Q[1]
 
     k = qrisp.QuantumFloat(2)
-    k[:] = {1: 1, 2: 1}  # superposition of k=1 and k=2
+    k[:] = {1: 1, 2: 1}
 
     result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE)
 
     meas = qrisp.multi_measurement([result[0], result[1]])
+    expected_probability = 0.5
     assert (expected_1.x, expected_1.y) in meas, (
         f"Missing Q+1*P=({expected_1.x},{expected_1.y}), got {meas}"
     )
     assert (expected_2.x, expected_2.y) in meas, (
         f"Missing Q+2*P=({expected_2.x},{expected_2.y}), got {meas}"
+    )
+    assert meas[(expected_1.x, expected_1.y)] == pytest.approx(expected_probability, abs=1e-6), (
+        f"Unexpected probability for Q+1*P: got {meas[(expected_1.x, expected_1.y)]}, "
+        f"expected {expected_probability}"
+    )
+    assert meas[(expected_2.x, expected_2.y)] == pytest.approx(expected_probability, abs=1e-6), (
+        f"Unexpected probability for Q+2*P: got {meas[(expected_2.x, expected_2.y)]}, "
+        f"expected {expected_probability}"
     )
     assert len(meas) == 2, f"Expected 2 outcomes, got {len(meas)}: {meas}"

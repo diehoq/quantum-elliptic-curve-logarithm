@@ -27,18 +27,8 @@ def test_kaliski_mod_inv(v_cl, p):
         expected_inverse: 1
     }, f"Quantum inverse did not match expected {expected_inverse} for v_cl={v_cl}, p={p}"
 
-@pytest.mark.parametrize("v_cl", range(1, 23))
 @pytest.mark.parametrize("p", primes)
-def test_kaliski_mod_inv_dynamic(v_cl, p):
-    if v_cl >= p:
-        pytest.skip()
-
-    try:
-        expected_inverse = pow(v_cl, -1, p)
-    except ValueError:
-        pytest.skip(f"No modular inverse exists for v={v_cl}, p={p} (non-coprime)")
-    
-    #@jaspify
+def test_kaliski_mod_inv_dynamic(p):
     @boolean_simulation
     def main(v_cl):
         v = QuantumModulus(p)
@@ -46,9 +36,21 @@ def test_kaliski_mod_inv_dynamic(v_cl, p):
         m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
         qECarithm.kaliski_mod_inv(v, p, m)
         return measure(v)
-    
-    result = main(v_cl)
-    assert result == expected_inverse, f"Quantum inverse {result} did not match expected {expected_inverse} for v={v_cl}, p={p}"
+
+    for v_cl in range(1, 23):
+        if v_cl >= p:
+            continue
+
+        try:
+            expected_inverse = pow(v_cl, -1, p)
+        except ValueError:
+            continue
+
+        result = main(v_cl)
+        assert result == expected_inverse, (
+            f"Quantum inverse {result} did not match expected {expected_inverse} "
+            f"for v={v_cl}, p={p}"
+        )
 
 
 @pytest.mark.parametrize("p", primes[:5])

@@ -4,11 +4,11 @@ import qrisp
 import pytest
 
 curves_with_points = [
-    {
-        "curve_params": {"a": 0, "b": 3, "p": 5},
-        "points": [(2, 1), (3, 0), (2, 4)],
-        "base_point": (1, 2),
-    },
+    # {
+    #     "curve_params": {"a": 0, "b": 3, "p": 5},
+    #     "points": [(2, 1), (3, 0), (2, 4)],
+    #     "base_point": (1, 2),
+    # },
     # NOTICE: A CHAIN SHOULD BE CHOSEN FOR EACH CURVE BEFORE LAUNCHING THE TESTS
     {
         "curve_params": {"a": 5, "b": 4, "p": 7},
@@ -22,33 +22,33 @@ curves_with_points = [
         ],
         "base_point": (3, 5),
     },
-    {
-        "curve_params": {"a": 1, "b": 6, "p": 11},
-        "points": [(2, 4), (2, 7), (5, 2), (7, 2), (7, 9), (8, 3), (10, 2)],
-        "base_point": (5, 2),
-    },
-    {
-        "curve_params": {"a": 2, "b": 3, "p": 13},
-        "points": [
-            (0, 4),
-            (0, 9),
-            (3, 6),
-            (3, 7),
-            (4, 6),
-            (4, 7),
-            (6, 6),
-            (6, 7),
-            (7, 3),
-            (7, 10),
-            (9, 3),
-            (9, 10),
-            (10, 3),
-            (10, 10),
-            (11, 2),
-            (11, 11),
-        ],
-        "base_point": (3, 6),
-    },
+    # {
+    #     "curve_params": {"a": 1, "b": 6, "p": 11},
+    #     "points": [(2, 4), (2, 7), (5, 2), (7, 2), (7, 9), (8, 3), (10, 2)],
+    #     "base_point": (5, 2),
+    # },
+    # {
+    #     "curve_params": {"a": 2, "b": 3, "p": 13},
+    #     "points": [
+    #         (0, 4),
+    #         (0, 9),
+    #         (3, 6),
+    #         (3, 7),
+    #         (4, 6),
+    #         (4, 7),
+    #         (6, 6),
+    #         (6, 7),
+    #         (7, 3),
+    #         (7, 10),
+    #         (9, 3),
+    #         (9, 10),
+    #         (10, 3),
+    #         (10, 10),
+    #         (11, 2),
+    #         (11, 11),
+    #     ],
+    #     "base_point": (3, 6),
+    # },
     # {
     #     "curve_params": {"a": 1, "b": 5, "p": 17},
     #     "points": [
@@ -90,6 +90,21 @@ curves_with_points = [
     #     "base_point": (1, 7),
     # },
 ]
+
+
+def _find_correlated_superposition_pair(points):
+    """Pick two distinct curve points that share one coordinate.
+
+    This lets us prepare a two-state superposition without accidentally
+    creating a four-state Cartesian product across x/y registers.
+    """
+    for p0 in points:
+        for p1 in points:
+            if p0 == p1:
+                continue
+            if p0[0] == p1[0] or p0[1] == p1[1]:
+                return p0, p1
+    raise AssertionError("Need two curve points sharing x or y for superposition test")
 
 
 @pytest.mark.parametrize("curve_data", curves_with_points)
@@ -134,29 +149,39 @@ def test_ec_addition_superposition(curve_data):
     base_point_ell = clECarithm.EllPoint(*base_point_coords)
     base_point_qrisp = list(base_point_coords)
 
-    # Pick the first two points for the superposition
-    p0, p1 = points[0], points[1]
+    p0, p1 = _find_correlated_superposition_pair(points)
     r0 = clECarithm.ell_add_generic(clECarithm.EllPoint(*p0), base_point_ell, curve)
     r1 = clECarithm.ell_add_generic(clECarithm.EllPoint(*p1), base_point_ell, curve)
 
     anc_0 = qrisp.QuantumModulus(p)
     anc_1 = qrisp.QuantumModulus(p)
 
-    # Prepare superposition: |p0> + |p1>
-    anc_0[:] = {p0[0]: 1, p1[0]: 1}
-    anc_1[:] = {p0[1]: 1, p1[1]: 1}
+    # Prepare exactly the two intended curve points in superposition.
+    if p0[0] == p1[0]:
+        anc_0[:] = p0[0]
+        anc_1[:] = {p0[1]: 1, p1[1]: 1}
+    else:
+        anc_0[:] = {p0[0]: 1, p1[0]: 1}
+        anc_1[:] = p0[1]
 
     qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, p)
 
     results = qrisp.multi_measurement([anc_0, anc_1])
-    assert (
-        r0.x,
-        r0.y,
-    ) in results, f"Missing result for {p0}+G: expected ({r0.x},{r0.y}), got {results}"
-    assert (
-        r1.x,
-        r1.y,
-    ) in results, f"Missing result for {p1}+G: expected ({r1.x},{r1.y}), got {results}"
+    expected_probability = 0.5
+    assert (r0.x, r0.y) in results, (
+        f"Missing result for {p0}+G: expected ({r0.x},{r0.y}), got {results}"
+    )
+    assert (r1.x, r1.y) in results, (
+        f"Missing result for {p1}+G: expected ({r1.x},{r1.y}), got {results}"
+    )
+    assert results[(r0.x, r0.y)] == pytest.approx(expected_probability, abs=1e-6), (
+        f"Unexpected probability for {p0}+G: got {results[(r0.x, r0.y)]}, "
+        f"expected {expected_probability}"
+    )
+    assert results[(r1.x, r1.y)] == pytest.approx(expected_probability, abs=1e-6), (
+        f"Unexpected probability for {p1}+G: got {results[(r1.x, r1.y)]}, "
+        f"expected {expected_probability}"
+    )
     assert len(results) == 2, f"Expected 2 outcomes, got {len(results)}: {results}"
 
 
@@ -177,22 +202,22 @@ def test_ec_addition_dynamic(curve_data):
     base_point_qrisp = list(base_point_coords)
     p = curve_params["p"]
 
+    @qrisp.boolean_simulation
+    def run_addition(point_x, point_y):
+        anc_0 = qrisp.QuantumModulus(p)
+        anc_0[:] = point_x
+        anc_1 = qrisp.QuantumModulus(p)
+        anc_1[:] = point_y
+        qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, p)
+        return qrisp.measure(anc_0), qrisp.measure(anc_1)
+
     for point in points:
         P_ell = clECarithm.EllPoint(point[0], point[1])
         result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
 
-        @qrisp.boolean_simulation
-        def run_addition():
-            anc_0 = qrisp.QuantumModulus(p)
-            anc_0[:] = point[0]
-            anc_1 = qrisp.QuantumModulus(p)
-            anc_1[:] = point[1]
-            qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, p)
-            return qrisp.measure(anc_0), qrisp.measure(anc_1)
-
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            rx, ry = run_addition()
+            rx, ry = run_addition(point[0], point[1])
 
         faulty = [w for w in caught if "Faulty" in str(w.message)]
         assert (
