@@ -265,9 +265,14 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
             anc[0] += 3 * G[0]  # step 9 //ctrl_add_const_modp
 
     # step 7 & 8: anc[0] -= l * l (in standard form)
+    # Use a copy of l for the second factor because the injection mechanism
+    # produces incorrect results when the same QuantumVariable is passed
+    # for both arguments under boolean_simulation (JAX tracing).
+    l_copy = QuantumModulus(p, inpl_adder=l.inpl_adder)
+    cx(l, l_copy)
     temp = QuantumModulus(p)
     injected_mul = temp << mul_func
-    with conjugate(injected_mul)(l, l):
+    with conjugate(injected_mul)(l, l_copy):
         temp.m = -m_red
         temp *= fwd_const
         temp.m = 0
@@ -279,6 +284,8 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
         temp *= rev_const
         temp.m = -m_red
     temp.delete()  # step 10
+    cx(l, l_copy)
+    l_copy.delete()
 
     # step 11: anc[1] += l * anc[0] (in standard form)
     temp = QuantumModulus(p)
@@ -323,15 +330,27 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
     anc[0] += G[0]  # step 17 (unconditional: undoes step 1)
 
 
-def q_ec_mult_add(power, res, k, curve):
+def q_ec_mult_add(power, res, k, curve, n_bits=None):
     # Elliptic curve multiplication Q + kP
-    n = k.size
+    #
+    # n_bits must be supplied when running under JAX tracing
+    # (e.g. @boolean_simulation) because k.size is a traced value
+    # and the loop must be unrolled at trace time (each iteration
+    # uses a different classical point doubling).
+    if n_bits is not None:
+        n = n_bits
+    else:
+        n = k.size
     p = curve.p
-    merge([res, k])
+    merge(res[0], res[1], k)
 
-    for i in jrange(n):
+    # Pre-compute all classical point doublings so that each
+    # iteration uses the correct 2^i * P.
+    powers = [tuple(power)]
+    for _ in range(n - 1):
+        powers.append(tuple(q_ec_double(list(powers[-1]), curve)))
+
+    for i in range(n):
         with control(k[i]):
-            q_ec_add_inpl(res, power, p)
-
-        power = q_ec_double(power, curve)
+            q_ec_add_inpl(res, powers[i], p)
     return res
