@@ -42,16 +42,27 @@ def test_ell_mult_add(k_val, n_bits):
 
 
 def test_ell_mult_add_dynamic():
-    """Test Q + k*P under @boolean_simulation while reusing cached circuits."""
-    p = CURVE.p
-    cases_by_n_bits = {
-        1: [1],
-        2: [1, 2, 3],
-    }
+    """Test Q + k*P under @boolean_simulation.
 
-    for n_bits, k_values in cases_by_n_bits.items():
+    q_ec_mult_add currently expects the QuantumFloat input to be fixed at trace
+    time, so we keep the cases grouped in one pytest test but still trace a
+    separate boolean-simulation function per k-value.
+    """
+    p = CURVE.p
+    cases = [
+        (1, 1),
+        (1, 2),
+        (2, 2),
+        (3, 2),
+    ]
+
+    for k_val, n_bits in cases:
+        expected = clECarithm.ell_mult_add(
+            clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), k_val, CURVE
+        )
+
         @qrisp.boolean_simulation
-        def run_mult_add(k_val):
+        def run_mult_add():
             res_0 = qrisp.QuantumModulus(p)
             res_0[:] = Q[0]
             res_1 = qrisp.QuantumModulus(p)
@@ -60,27 +71,22 @@ def test_ell_mult_add_dynamic():
             k = qrisp.QuantumFloat(n_bits)
             k[:] = k_val
 
-            result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE)
+            result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE, n_bits=n_bits)
             return qrisp.measure(result[0]), qrisp.measure(result[1])
 
-        for k_val in k_values:
-            expected = clECarithm.ell_mult_add(
-                clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), k_val, CURVE
-            )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            rx, ry = run_mult_add()
 
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter("always")
-                rx, ry = run_mult_add(k_val)
-
-            faulty = [w for w in caught if "Faulty" in str(w.message)]
-            assert len(faulty) == 0, (
-                f"Faulty uncomputation warnings for k={k_val}, n_bits={n_bits}: "
-                f"{[str(w.message) for w in faulty]}"
-            )
-            assert (int(rx), int(ry)) == (expected.x, expected.y), (
-                f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), "
-                f"got ({int(rx)}, {int(ry)})"
-            )
+        faulty = [w for w in caught if "Faulty" in str(w.message)]
+        assert len(faulty) == 0, (
+            f"Faulty uncomputation warnings for k={k_val}, n_bits={n_bits}: "
+            f"{[str(w.message) for w in faulty]}"
+        )
+        assert (int(rx), int(ry)) == (expected.x, expected.y), (
+            f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), "
+            f"got ({int(rx)}, {int(ry)})"
+        )
 
 
 def test_ell_mult_add_k_superposition():
