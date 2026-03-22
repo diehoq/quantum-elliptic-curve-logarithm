@@ -3,6 +3,7 @@ import pytest
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
 import warnings
+from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
 
 
 # Curve: y² = x³ + 5x + 4 mod 7
@@ -127,3 +128,55 @@ def test_ell_mult_add_k_superposition():
         f"expected {expected_probability}"
     )
     assert len(meas) == 2, f"Expected 2 outcomes, got {len(meas)}: {meas}"
+
+
+# ---- BigInteger tests ----
+# Same curve y² = x³ + 5x + 4 mod 7 but with BigInteger modulus (1 limb).
+BI_SIZE = 1  # 1 limb = 32 bits, enough for p=7
+CURVE_BI = clECarithm.EllCurve(a=5, b=4, p=BigInteger.create_static(7, BI_SIZE))
+
+
+def test_ell_mult_add_biginteger_dynamic():
+    """Test Q + k*P under @boolean_simulation with BigInteger modulus."""
+    p_bi = CURVE_BI.p
+    cases = [
+        (1, 1),
+        (2, 2),
+        (3, 2),
+    ]
+
+    for k_val, n_bits in cases:
+        expected = clECarithm.ell_mult_add(
+            clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), k_val, CURVE
+        )
+
+        @qrisp.boolean_simulation
+        def run_mult_add():
+            res_0 = qrisp.QuantumModulus(p_bi)
+            res_0[:] = BigInteger.create_static(Q[0], BI_SIZE)
+            res_1 = qrisp.QuantumModulus(p_bi)
+            res_1[:] = BigInteger.create_static(Q[1], BI_SIZE)
+
+            k = qrisp.QuantumFloat(n_bits)
+            k[:] = k_val
+
+            result = qECarithm.q_ec_mult_add(
+                list(P), [res_0, res_1], k, CURVE_BI, n_bits=n_bits
+            )
+            return qrisp.measure(result[0]), qrisp.measure(result[1])
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            rx, ry = run_mult_add()
+
+        faulty = [w for w in caught if "Faulty" in str(w.message)]
+        assert len(faulty) == 0, (
+            f"BigInteger k={k_val}, n_bits={n_bits}: "
+            f"Faulty uncomputation warnings: {[str(w.message) for w in faulty]}"
+        )
+        rx_int = int(rx()) if isinstance(rx, BigInteger) else int(rx)
+        ry_int = int(ry()) if isinstance(ry, BigInteger) else int(ry)
+        assert (rx_int, ry_int) == (expected.x, expected.y), (
+            f"BigInteger k={k_val}, n_bits={n_bits}: "
+            f"expected ({expected.x}, {expected.y}), got ({rx_int}, {ry_int})"
+        )
