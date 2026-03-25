@@ -2,20 +2,6 @@
 Reproducible example: @count_ops profiling is extremely slow for deeply
 nested circuits used in EC arithmetic.
 
-Summary of findings (4-bit prime p=13, BigInteger modulus):
-
-  Operation            | make_jaspr  | count_ops
-  ---------------------|-------------|----------
-  kaliski_mod_inv      |   ~8 s      |  ~67 s
-  q_ec_add_inpl        |   ~9 s      |  ~200+ s  (extrapolated)
-  q_ec_add_inpl (ctrl) |   ~9 s      |  ~200+ s  (extrapolated)
-  full 4-bit ECDLP     |  ~15 s      |  ~700+ s  (extrapolated)
-
-The bottleneck is the profiling evaluator in
-  qrisp/jasp/interpreter_tools/interpreters/profiling_interpreter.py
-which recursively JIT-compiles and evaluates sub-jasprs for every
-conjugation_env and ctrl_env, making deeply nested circuits very slow.
-
 `make_jaspr` (tracing only, no profiling) is fast because it only records
 the circuit structure as a Jaspr IR without evaluating gate counts.
 
