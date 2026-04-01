@@ -2,10 +2,13 @@ import src.quantum.ec_arithmetic as qECarithm
 import pytest
 import qrisp
 from qrisp import measure, QuantumModulus, QuantumArray, QuantumBool, boolean_simulation
+from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
 
 
 
 primes = [3, 5, 7, 11, 13, 17, 19, 23]
+BI_SIZE = 1
+BIGINT_PRIMES = [7, 13]
 
 @pytest.mark.parametrize("v_cl", range(1, 23))
 @pytest.mark.parametrize("p", primes)
@@ -76,4 +79,30 @@ def test_kaliski_mod_inv_superposition(p):
         assert results[value] == pytest.approx(expected_probability, abs=1e-6), (
             f"p={p}: output {value} had probability {results[value]}, "
             f"expected {expected_probability}"
+        )
+
+
+@pytest.mark.parametrize("p", BIGINT_PRIMES)
+def test_kaliski_mod_inv_biginteger_dynamic(p):
+    p_bi = BigInteger.create_static(p, BI_SIZE)
+
+    @boolean_simulation
+    def main(v_cl):
+        v = QuantumModulus(p_bi)
+        v[:] = v_cl
+        m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
+        qECarithm.kaliski_mod_inv(v, p, m)
+        return measure(v)
+
+    for v_cl in range(1, p):
+        try:
+            expected_inverse = pow(v_cl, -1, p)
+        except ValueError:
+            continue
+
+        result = main(v_cl)
+        result_int = int(result()) if isinstance(result, BigInteger) else int(result)
+        assert result_int == expected_inverse, (
+            f"BigInteger inverse {result_int} did not match expected {expected_inverse} "
+            f"for v={v_cl}, p={p}"
         )
