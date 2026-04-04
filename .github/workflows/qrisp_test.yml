@@ -22,7 +22,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install \
             pytest==8.0.2 \
-            qrisp==0.7.11 \
+            git+https://github.com/diehoq/Qrisp.git@b95ca0c214f32bc699bf8327997d98f61e471f78 \
             qiskit==2.2.3 \
             sympy==1.13.0 \
             psutil==7.1.3
