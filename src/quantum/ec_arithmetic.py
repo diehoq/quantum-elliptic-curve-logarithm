@@ -1,4 +1,5 @@
 import math
+import numpy as np
 from qrisp import (
     QuantumBool,
     QuantumModulus,
@@ -17,17 +18,52 @@ from qrisp import (
     custom_control,
     qache,
 )
+from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
+from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_mod_tools import (
+    modinv as bi_modinv,
+    smallest_power_of_two,
+)
 
 
-def to_montgomery(x, p):
-    n = p.bit_length()
-    x *= 2**n % p
+def _p_int(p):
+    """Return p as a Python int (works for both int and BigInteger).
+
+    Safe to call inside jax.jit ONLY when p's digits are concrete (non-traced).
+    This works for BigIntegers from QuantumVariable aux_data (e.g., v.modulus)
+    but NOT for BigIntegers created inside jit.
+    """
+    if isinstance(p, BigInteger):
+        digits = np.asarray(p.digits)
+        result = 0
+        for i in range(len(digits)):
+            d = int(digits[i])
+            if d:
+                result += d << (32 * i)
+        return result
+    return int(p)
+
+
+def _bi(val, p):
+    """Convert val to BigInteger if p is BigInteger, else return val unchanged."""
+    if isinstance(p, BigInteger):
+        return BigInteger.create_static(int(val), p.digits.shape[0])
+    return val
+
+
+def to_montgomery(x, p_int):
+    """Convert x to Montgomery form. p_int must be a Python int."""
+    n = p_int.bit_length()
+    # QuantumModulus __imul__ handles int→BigInteger via encoder automatically
+    const = pow(2, n, p_int)
+    x *= const
     return x
 
 
-def to_standard(x, p):
-    n = p.bit_length()
-    x *= pow(2**n, -1, p) % p
+def to_standard(x, p_int):
+    """Convert x from Montgomery form. p_int must be a Python int."""
+    n = p_int.bit_length()
+    const = pow(pow(2, n, p_int), -1, p_int)
+    x *= const
     return x
 
 
@@ -47,15 +83,29 @@ def to_standard_qm(x):
 
 
 # Consider moving this function to qrisp source code
-def inpl_rsub(r, p):
+def inpl_rsub(r, p_int, mod_int=None):
     # Compute r := (p - r) mod p.
+    # p_int must be a Python int.
+    # mod_int: optional Python int for r's modulus (avoids _p_int on traced BigInteger).
     # The bit-trick (NOT + add modulus+1 + modular-add p) creates intermediate
     # value == modulus when r=0, which breaks mod_adder (its ancilla can't
     # uncompute because a=0 makes forward/reverse additions all no-ops).
     # This only matters when p % r.modulus == 0 (i.e. modulus == p), because
     # then __iadd__ pre-reduces p to 0 and mod_adder receives a=0.
     # For modulus == 2p, the add is non-degenerate and mod_adder works fine.
-    if p % int(r.modulus) == 0:
+    use_bi = isinstance(r.modulus, BigInteger)
+    bi_size = r.modulus.digits.shape[0] if use_bi else None
+
+    def _coerce_const(value):
+        """Route int→BigInteger via BigInteger.coerce when in BigInteger mode."""
+        if use_bi:
+            return BigInteger.coerce(int(value), bi_size)
+        return value
+
+    mod_i = mod_int if mod_int is not None else _p_int(r.modulus)
+    mod_plus_1 = _coerce_const(mod_i + 1)
+    p_value = _coerce_const(p_int)
+    if p_int % mod_i == 0:
         # r += p reduces to mod_adder(0,...) which faults on value=modulus.
         # Fix: skip when r=0 (it's a no-op since (p-0) mod p = 0).
         is_zero = QuantumBool()
@@ -63,27 +113,85 @@ def inpl_rsub(r, p):
         with conjugate(eq)(r, 0):
             with control(is_zero, ctrl_state="0"):
                 x(r)
-                r.inpl_adder(r.modulus + 1, r)
-                r += p
+                r.inpl_adder(mod_plus_1, r)
+                r += p_value
         is_zero.delete()
     else:
         x(r)
-        r.inpl_adder(r.modulus + 1, r)
-        r += p
+        r.inpl_adder(mod_plus_1, r)
+        r += p_value
 
 
 # Consider moving this function to qrisp source code
 # This function is used to compute the modular inverse of a number
 @qache(static_argnums=[1])
 def kaliski_mod_inv(v, p, m):
+    # p is always a Python int (required for @qache hashing).
+    # Detect BigInteger mode from the quantum register's modulus.
+    use_bi = isinstance(v.modulus, BigInteger)
+    bi_size = v.modulus.digits.shape[0] if use_bi else None
+
+    def _mk_bi(val):
+        """Convert int val to BigInteger if v uses BigInteger modulus."""
+        if use_bi:
+            return BigInteger.create_static(int(val), bi_size)
+        return val
+
+    def _load_qfloat_constant(qf, value, width):
+        """Load a non-negative Python int without going through float64 encoding."""
+        for bit in range(width):
+            if (value >> bit) & 1:
+                x(qf[bit])
+
+    def _toggle_if_qfloat_equals_int(qf, value, target, width):
+        chunk_size = 8
+        chunk_flags = []
+
+        for start in range(0, width, chunk_size):
+            stop = min(start + chunk_size, width)
+            flag = QuantumBool()
+            ctrl_state = "".join(
+                "1" if (value >> bit) & 1 else "0" for bit in range(start, stop)
+            )
+            mcx([qf[bit] for bit in range(start, stop)], flag, ctrl_state=ctrl_state)
+            chunk_flags.append((flag, start, stop, ctrl_state))
+
+        reduction_gates = []
+        current_flags = [flag for flag, _, _, _ in chunk_flags]
+        while len(current_flags) > 1:
+            next_flags = []
+            for i in range(0, len(current_flags), 2):
+                if i + 1 == len(current_flags):
+                    next_flags.append(current_flags[i])
+                    continue
+                merged_flag = QuantumBool()
+                mcx([current_flags[i], current_flags[i + 1]], merged_flag)
+                reduction_gates.append((merged_flag, current_flags[i], current_flags[i + 1]))
+                next_flags.append(merged_flag)
+            current_flags = next_flags
+
+        cx(current_flags[0], target)
+
+        for merged_flag, left_flag, right_flag in reversed(reduction_gates):
+            mcx([left_flag, right_flag], merged_flag)
+            merged_flag.delete()
+
+        for flag, start, stop, ctrl_state in reversed(chunk_flags):
+            mcx([qf[bit] for bit in range(start, stop)], flag, ctrl_state=ctrl_state)
+            flag.delete()
+
     n = p.bit_length()
-    # Convert to Montgomery
+    # For QuantumModulus construction, we need BigInteger modulus when use_bi.
+    # For quantum operations (+=, -=, >, *=), we pass Python ints directly;
+    # the QuantumModulus encoder handles int→BigInteger conversion automatically.
+    two_p = _mk_bi(2 * p)
+    # Convert to Montgomery — pass Python int p for classical computation
     to_montgomery(v, p)
     u = QuantumFloat(n)
-    u[:] = p
-    r = QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
+    _load_qfloat_constant(u, p, n)
+    r = QuantumModulus(two_p, inpl_adder=v.inpl_adder)
     r[:] = 0
-    s = QuantumModulus(2 * p, inpl_adder=v.inpl_adder)
+    s = QuantumModulus(two_p, inpl_adder=v.inpl_adder)
     s[:] = 1
 
     a = QuantumBool()
@@ -138,7 +246,7 @@ def kaliski_mod_inv(v, p, m):
 
         singular_shift(r)
 
-        larger = r > p
+        larger = r > _mk_bi(p)
         with control(larger):
             r -= p
         cx(r[0], larger[0])
@@ -158,13 +266,13 @@ def kaliski_mod_inv(v, p, m):
     # u=p, v=0, r=0, s=1.  Detect via u==p (u=1 for all v!=0)
     # and neutralise r so that inpl_rsub(p,p)=0, keeping v=0 after swap.
     v_was_zero = QuantumBool()
-    eq_u_p = v_was_zero << (lambda a, b: a == b)
-    with conjugate(eq_u_p)(u, p):
-        with control(v_was_zero):
-            r += p
+    _toggle_if_qfloat_equals_int(u, p, v_was_zero, n)
+    with control(v_was_zero):
+        r += p
+    _toggle_if_qfloat_equals_int(u, p, v_was_zero, n)
     v_was_zero.delete()
 
-    inpl_rsub(r, p)
+    inpl_rsub(r, p, mod_int=2 * p)
 
     for i in jrange(v.size):
         swap(v[i], r[i])
@@ -197,31 +305,38 @@ def kaliski_mod_inv(v, p, m):
 
 def q_ec_double(P, curve):
     p = curve.p
-    s = ((3 * (P[0] * P[0] % p) + curve.a) % p) * pow((2 * P[1]) % p, -1, p)
-    xr = (s * s - 2 * P[0]) % p
-    yr = P[1] - s * ((P[0] - xr) % p) % p
+    p_i = _p_int(p)
+    s = ((3 * (P[0] * P[0] % p_i) + curve.a) % p_i) * pow((2 * P[1]) % p_i, -1, p_i)
+    xr = (s * s - 2 * P[0]) % p_i
+    yr = P[1] - s * ((P[0] - xr) % p_i) % p_i
     # CHOOSE APPROPRIATE RETURN TYPE
-    return [xr, (p - yr) % p]
+    return [xr, (p_i - yr) % p_i]
 
 
 @custom_control
 def q_ec_add_inpl(anc, G, p, ctrl=None):
     # return the result of P + Q
     # Following C3 in the paper
-    # Recover p as a Python int since @custom_control may trace it
-    p = int(anc[0].modulus)
+    # Recover p from quantum register's modulus (may be BigInteger or int)
+    p_raw = anc[0].modulus
+    p_i = _p_int(p_raw)
+    use_bi = isinstance(p_raw, BigInteger)
     mul_func = lambda x, y: x * y
 
     # Montgomery reduction shift: injection (<<) doesn't propagate .m from
     # the multiplication result, so we set it manually after each injection.
-    n_bits = p.bit_length()
-    m_red = math.ceil(math.log2((p - 1) ** 2) + 1) - n_bits
+    n_bits = p_i.bit_length()
+    m_red = math.ceil(math.log2((p_i - 1) ** 2) + 1) - n_bits
 
     # Precompute constants for manual to_standard / to_montgomery.
     # conjugate(to_standard_qm) has a faulty-uncomputation bug under
     # boolean_simulation, so we apply the conversion manually.
-    fwd_const = pow(2, m_red, p)  # to_standard multiplier
-    rev_const = pow(2, -m_red, p)  # to_montgomery multiplier (inverse)
+    fwd_const = pow(2, m_red, p_i)  # to_standard multiplier (int; encoder handles BigInteger)
+    rev_const = pow(2, -m_red, p_i)  # to_montgomery multiplier (int; encoder handles BigInteger)
+
+    # G values are used as classical constants in quantum ops.
+    # When modulus is BigInteger, the QuantumModulus operators handle
+    # the int-to-BigInteger conversion automatically via __rmod__.
 
     if ctrl is None:
         anc[1] -= G[1]
@@ -230,11 +345,11 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
             anc[1] -= G[1]  # step 2 //ctrl_sub_const_modp
     anc[0] -= G[0]  # step 1
 
-    m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
-    l = QuantumModulus(p, inpl_adder=anc[0].inpl_adder)
+    m = QuantumArray(qtype=QuantumBool(), shape=(2 * n_bits,))
+    l = QuantumModulus(p_raw, inpl_adder=anc[0].inpl_adder)
     # step 3 & 4 & 6: compute (anc[1] * kaliski_inv(anc[0])) in standard form -> l
-    with conjugate(kaliski_mod_inv)(anc[0], p, m):
-        temp = QuantumModulus(p)
+    with conjugate(kaliski_mod_inv)(anc[0], p_i, m):
+        temp = QuantumModulus(p_raw)
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
             temp.m = -m_red
@@ -247,7 +362,7 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
     m.delete()
 
     # step 5: anc[1] -= l * anc[0] (in standard form)
-    temp = QuantumModulus(p)
+    temp = QuantumModulus(p_raw)
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, anc[0]):
         temp.m = -m_red
@@ -259,18 +374,18 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
     temp.delete()
 
     if ctrl is None:
-        anc[0] += 3 * G[0]
+        anc[0] += G[0] * 3
     else:
         with control(ctrl):
-            anc[0] += 3 * G[0]  # step 9 //ctrl_add_const_modp
+            anc[0] += G[0] * 3  # step 9 //ctrl_add_const_modp
 
     # step 7 & 8: anc[0] -= l * l (in standard form)
     # Use a copy of l for the second factor because the injection mechanism
     # produces incorrect results when the same QuantumVariable is passed
     # for both arguments under boolean_simulation (JAX tracing).
-    l_copy = QuantumModulus(p, inpl_adder=l.inpl_adder)
+    l_copy = QuantumModulus(p_raw, inpl_adder=l.inpl_adder)
     cx(l, l_copy)
-    temp = QuantumModulus(p)
+    temp = QuantumModulus(p_raw)
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, l_copy):
         temp.m = -m_red
@@ -288,7 +403,7 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
     l_copy.delete()
 
     # step 11: anc[1] += l * anc[0] (in standard form)
-    temp = QuantumModulus(p)
+    temp = QuantumModulus(p_raw)
     injected_mul = temp << mul_func
     with conjugate(injected_mul)(l, anc[0]):
         temp.m = -m_red
@@ -300,9 +415,9 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
     temp.delete()
 
     # step 12-14: uncompute l via second kaliski inversion
-    m = QuantumArray(qtype=QuantumBool(), shape=(2 * p.bit_length(),))
-    with conjugate(kaliski_mod_inv)(anc[0], p, m):
-        temp = QuantumModulus(p)
+    m = QuantumArray(qtype=QuantumBool(), shape=(2 * n_bits,))
+    with conjugate(kaliski_mod_inv)(anc[0], p_i, m):
+        temp = QuantumModulus(p_raw)
         injected_mul = temp << mul_func
         with conjugate(injected_mul)(anc[1], anc[0]):
             temp.m = -m_red
@@ -322,10 +437,10 @@ def q_ec_add_inpl(anc, G, p, ctrl=None):
             anc[1] -= G[1]  # step 16 //ctrl_sub_const_modp
 
     if ctrl is None:
-        inpl_rsub(anc[0], p)  # step 15
+        inpl_rsub(anc[0], p_i, mod_int=p_i)  # step 15
     else:
         with control(ctrl):
-            inpl_rsub(anc[0], p)  # step 15 //ctrl_neg_modp
+            inpl_rsub(anc[0], p_i, mod_int=p_i)  # step 15 //ctrl_neg_modp
 
     anc[0] += G[0]  # step 17 (unconditional: undoes step 1)
 
@@ -342,7 +457,11 @@ def q_ec_mult_add(power, res, k, curve, n_bits=None):
     else:
         n = k.size
     p = curve.p
-    merge(res[0], res[1], k)
+    # Under JAX tracing all QVs share a single TracingQuantumSession,
+    # so merge is a no-op.  Calling it would trigger __iter__ on dynamic QVs.
+    from qrisp.jasp import check_for_tracing_mode
+    if not check_for_tracing_mode():
+        merge(res[0], res[1], k)
 
     # Pre-compute all classical point doublings so that each
     # iteration uses the correct 2^i * P.
@@ -351,6 +470,13 @@ def q_ec_mult_add(power, res, k, curve, n_bits=None):
         powers.append(tuple(q_ec_double(list(powers[-1]), curve)))
 
     for i in range(n):
-        with control(k[i]):
-            q_ec_add_inpl(res, powers[i], p)
+        # When modulus is BigInteger, convert classical coordinates to
+        # BigIntegers so they don't overflow JAX's int64 during tracing.
+        if isinstance(p, BigInteger):
+            bi_size = p.digits.shape[0]
+            g_i = (BigInteger.create_static(int(powers[i][0]), bi_size),
+                   BigInteger.create_static(int(powers[i][1]), bi_size))
+        else:
+            g_i = powers[i]
+        q_ec_add_inpl(res, g_i, p, ctrl=k[i])
     return res

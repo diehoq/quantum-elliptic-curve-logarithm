@@ -59,6 +59,30 @@ def test_controlled_addition_ctrl_off():
         f"ctrl=0: expected ({P[0]}, {P[1]}), got {result}"
     )
 
+
+@pytest.mark.parametrize(
+    "ctrl_value, expected",
+    [
+        (False, P),
+        (True, (R.x, R.y)),
+    ],
+)
+def test_controlled_addition_explicit_ctrl_kwarg(ctrl_value, expected):
+    """Explicit ctrl=... should match the outer-control behavior."""
+    ctrl = qrisp.QuantumBool()
+    ctrl[:] = ctrl_value
+    anc_0 = qrisp.QuantumModulus(CURVE.p)
+    anc_0[:] = P[0]
+    anc_1 = qrisp.QuantumModulus(CURVE.p)
+    anc_1[:] = P[1]
+
+    qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G), CURVE.p, ctrl=ctrl[0])
+
+    result = qrisp.multi_measurement([anc_0, anc_1])
+    assert result == {expected: 1}, (
+        f"explicit ctrl={ctrl_value}: expected {expected}, got {result}"
+    )
+
 def test_controlled_addition_boolean_sim():
     """Test ctrl=|0> and ctrl=|1> under one cached @boolean_simulation circuit."""
     @qrisp.boolean_simulation
