@@ -1,6 +1,6 @@
 # Quantum Elliptic Curve Discrete Logarithm — QDay Prize Submission
 
-This repository contains a fully compilable implementation of **Shor's algorithm for the Elliptic Curve Discrete Logarithm Problem (ECDLP)**, targeting the [QDay Prize](https://www.qdayprize.org/) challenge. The implementation is built on [Qrisp](https://www.qrisp.eu/), a high-level quantum programming language, and demonstrates end-to-end compilation and resource estimation from 4-bit toy curves up to 256-bit (secp256k1-scale).
+This repository contains a fully compilable, **dynamic** implementation of **Shor's algorithm for the Elliptic Curve Discrete Logarithm Problem (ECDLP)**, targeting the [QDay Prize](https://www.qdayprize.org/) challenge. The implementation is built on [Qrisp](https://www.qrisp.eu/), uses BigInteger-enabled JAX tracing, and demonstrates that the same code path can be compiled and resource-profiled from 4-bit toy curves up to 256-bit (secp256k1-scale).
 
 ---
 
@@ -22,6 +22,7 @@ I hold a Master's degree in Quantum Science and Engineering from EPFL (graduated
 - larger generated curves up to **256-bit**, via [`EC_discrete_log_compilation.ipynb`](EC_discrete_log_compilation.ipynb)
 
 The algorithm derives private keys from the standard public keys using Shor's ECDLP algorithm, and the two notebooks separate the QDay-prize sweep from the larger-bit-size scaling study.
+Because the implementation is dynamic and BigInteger-enabled, each target instance can be compiled directly and profiled through the same workflow rather than through hand-specialized static circuits for each size.
 
 ## Quantum Computer / Simulator
 
@@ -43,9 +44,9 @@ The paper describes a **static implementation** where the full quantum circuit f
 
 Beyond the static approach from the paper, this repository introduces **dynamic compilation through JAX** (Qrisp's `jasp` subsystem). Key advances:
 
-- **JAX-traceable compilation**: The quantum algorithm is traced through JAX's just-in-time compilation (`jax.jit`), enabling dynamic circuit generation and optimization. This is powered by Qrisp's `jasp` module, which bridges quantum operations with JAX's transformation framework.
-- **BigInteger support**: To handle prime fields exceeding the native 64-bit JAX integer limit, we use Qrisp's `BigInteger` class — a fixed-width array of 32-bit limbs registered as a JAX pytree node. This enables compilation for arbitrarily large primes (up to 256-bit and beyond) while remaining fully JAX-traceable. See [`BIGINTEGER_INTEGRATION.md`](BIGINTEGER_INTEGRATION.md) for the full technical summary.
-- **`count_ops` resource estimation**: Qrisp's `@count_ops` decorator traces a single controlled EC point addition and extracts a complete gate-count breakdown without executing the full circuit. Combined with the structural insight that all $2n$ controlled additions have identical gate structure (only the classical point differs), this enables resource estimation at scale: $\text{total} = 2n \times \text{single\_add} + \text{overhead}$.
+- **JAX-traceable compilation**: The quantum algorithm is traced through JAX's just-in-time compilation (`jax.jit`), enabling dynamic circuit generation and optimization. This is powered by Qrisp's `jasp` module, which bridges quantum operations with JAX's transformation framework and makes each curve instance easy to compile and inspect directly.
+- **BigInteger support**: To handle prime fields exceeding the native 64-bit JAX integer limit, we use Qrisp's `BigInteger` class — a fixed-width array of 32-bit limbs registered as a JAX pytree node. This lets the same dynamic implementation compile arbitrarily large primes (up to 256-bit and beyond) while remaining fully JAX-traceable, so large curves can be profiled without rewriting the arithmetic pipeline. See [`BIGINTEGER_INTEGRATION.md`](BIGINTEGER_INTEGRATION.md) for the full technical summary.
+- **`count_ops` resource estimation**: Qrisp's `@count_ops` decorator traces a single controlled EC point addition and extracts a complete gate-count breakdown without executing the full circuit. Combined with the structural insight that all $2n$ controlled additions have identical gate structure (only the classical point differs), this makes the dynamic implementation easy to resource-profile at scale: $\text{total} = 2n \times \text{single\_add} + \text{overhead}$.
 
 ## Qrisp Dependencies
 
@@ -145,6 +146,7 @@ pytest tests/ -v
 - The `@count_ops` approach traces a single EC addition and extracts gate counts without simulating the full circuit, making 256-bit estimation feasible on standard hardware.
 - All curves use the equation $y^2 = x^3 + 7 \pmod{p}$ (matching secp256k1 form).
 - The notebook split is intentional: [`resource_estimation_all_curves.ipynb`](resource_estimation_all_curves.ipynb) is for the QDay prize curve set, while [`EC_discrete_log_compilation.ipynb`](EC_discrete_log_compilation.ipynb) is for larger-curve compilation and scaling up to 256-bit.
+- The central implementation is dynamic rather than size-specific: BigInteger support and JAX tracing make it straightforward to compile and profile new curve instances through the same code path.
 
 ## Other Documents
 

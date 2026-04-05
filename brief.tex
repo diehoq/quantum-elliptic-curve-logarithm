@@ -23,7 +23,7 @@
 
 \section*{Approach}
 
-We implement \textbf{Shor's algorithm for the Elliptic Curve Discrete Logarithm Problem (ECDLP)} using \textbf{Qrisp}, a high-level quantum programming language built on top of Qiskit. Given a generator point $G$ and public key $P = kG$ on an elliptic curve $y^2 = x^3 + 7 \pmod{p}$, the algorithm recovers the private key $k$ via quantum phase estimation on the group operation.
+We implement \textbf{Shor's algorithm for the Elliptic Curve Discrete Logarithm Problem (ECDLP)} using \textbf{Qrisp}, a high-level quantum programming language built on top of Qiskit. The repository submission is a \emph{dynamic} implementation: given a generator point $G$ and public key $P = kG$ on an elliptic curve $y^2 = x^3 + 7 \pmod{p}$, the same code path can be specialized, compiled, and profiled for each concrete curve instance.
 
 The core algorithm prepares two $n$-qubit QPE registers in superposition, performs $2n$ controlled EC point additions (multiplying by both $G$ and $P$), applies inverse QFT, and extracts $k$ from the measurement outcomes via continued-fraction expansion. This follows the standard Shor ECDLP construction described in our paper~\cite{polimeni2025}.
 
@@ -33,17 +33,17 @@ The core algorithm prepares two $n$-qubit QPE registers in superposition, perfor
 As detailed in~\cite{polimeni2025}, we realize all EC arithmetic---point addition, point doubling, Kaliski modular inversion, Montgomery modular multiplication---as compilable quantum circuits using Qrisp's \texttt{QuantumModulus} type and in-place modular arithmetic primitives. Every operation is decomposed into elementary gates (H, CNOT, T, T$^\dagger$) at compile time.
 
 \textbf{Dynamic compilation via JAX (\texttt{jasp}).}  
-Beyond the static approach, we introduce \textbf{JAX-traceable dynamic compilation} through Qrisp's \texttt{jasp} subsystem. The quantum algorithm is traced through \texttt{jax.jit}, enabling dynamic circuit generation, loop unrolling, and optimization. This is critical for scaling to large bit sizes where static unrolling would be intractable.
+Beyond the static approach, we introduce \textbf{JAX-traceable dynamic compilation} through Qrisp's \texttt{jasp} subsystem. The quantum algorithm is traced through \texttt{jax.jit}, enabling dynamic circuit generation, loop unrolling, and optimization. This makes the implementation directly compilable for each curve instance instead of requiring a separate hand-specialized static circuit for every target size.
 
 \textbf{BigInteger support.}  
-To handle prime fields exceeding the native 64-bit JAX integer limit, we developed a \texttt{BigInteger} class---a fixed-width array of 32-bit limbs registered as a JAX pytree node. This enables compilation for arbitrarily large primes (up to 256-bit and beyond) while remaining fully JAX-traceable. All classical computation uses Python \texttt{int} values; \texttt{BigInteger} values appear only in \texttt{QuantumModulus} register construction and internal operator dispatch.
+To handle prime fields exceeding the native 64-bit JAX integer limit, we developed a \texttt{BigInteger} class---a fixed-width array of 32-bit limbs registered as a JAX pytree node. This enables compilation for arbitrarily large primes (up to 256-bit and beyond) while remaining fully JAX-traceable. All classical computation uses Python \texttt{int} values; \texttt{BigInteger} values appear only in \texttt{QuantumModulus} register construction and internal operator dispatch. In practice, this means the same dynamic implementation can be compiled and resource-profiled from the QDay prize curves through the 256-bit setting.
 
 \textbf{Scalable resource estimation.}  
 Every controlled EC addition in the Shor loop has \emph{identical gate structure} regardless of the classical point---only the modulus bit-width matters. We exploit this by counting gates for a \emph{single} controlled addition via Qrisp's \texttt{@count\_ops} decorator and computing:
 \[
 \text{Total gates} = 2n \times \text{(single EC addition)} + \text{overhead}
 \]
-where overhead covers Hadamard preparation, initial encoding, inverse QFT, and measurement. This makes 256-bit resource estimation feasible on standard hardware without tracing 512 full EC additions.
+where overhead covers Hadamard preparation, initial encoding, inverse QFT, and measurement. This makes the dynamic, BigInteger-enabled implementation easy to profile, and keeps 256-bit resource estimation feasible on standard hardware without tracing 512 full EC additions.
 
 To make the repository structure explicit, we separate the two resource-estimation use cases into two notebooks: \texttt{resource\_estimation\_all\_curves.ipynb} compiles all QDay prize curves (4--21 bit), while \texttt{EC\_discrete\_log\_compilation.ipynb} focuses on larger generated curves and the scaling path up to 256-bit.
 
