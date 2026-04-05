@@ -16,7 +16,12 @@ I hold a Master's degree in Quantum Science and Engineering from EPFL (graduated
 
 ## Key Broken
 
-**TBD** — Resource estimation demonstrates compilation feasibility for all [QDay standard curves](https://www.qdayprize.org/curves) (4–21 bit). The algorithm derives private keys from the standard public keys using Shor's ECDLP algorithm. The resource estimation notebook ([`resource_estimation_all_curves.ipynb`](resource_estimation_all_curves.ipynb)) compiles and counts gates for every curve in the standard set plus larger targets up to 256-bit.
+**TBD** — Resource estimation demonstrates compilation feasibility for both:
+
+- all [QDay standard curves](https://www.qdayprize.org/curves) (4–21 bit), via [`resource_estimation_all_curves.ipynb`](resource_estimation_all_curves.ipynb)
+- larger generated curves up to **256-bit**, via [`EC_discrete_log_compilation.ipynb`](EC_discrete_log_compilation.ipynb)
+
+The algorithm derives private keys from the standard public keys using Shor's ECDLP algorithm, and the two notebooks separate the QDay-prize sweep from the larger-bit-size scaling study.
 
 ## Quantum Computer / Simulator
 
@@ -61,8 +66,8 @@ Until these are merged into Qrisp's main branch, install the development branch 
 ├── pyproject.toml                   # Project configuration
 │
 ├── Shor_EC_discrete_log.ipynb       # Full Shor ECDLP algorithm (small example)
-├── EC_discrete_log_compilation.ipynb # Resource estimation (selected bit sizes)
-├── resource_estimation_all_curves.ipynb # Resource estimation for ALL standard curves + large targets
+├── EC_discrete_log_compilation.ipynb # Compilation + resource estimation for larger curves up to 256-bit
+├── resource_estimation_all_curves.ipynb # Compilation + resource estimation for all QDay standard curves
 │
 ├── BIGINTEGER_INTEGRATION.md        # Technical notes on BigInteger integration
 │
@@ -117,17 +122,17 @@ jupyter notebook Shor_EC_discrete_log.ipynb
 ```
 This notebook runs the complete Shor algorithm on a small (5-bit) curve using Qrisp's simulator.
 
-**2. Resource estimation for selected bit sizes:**
+**2. Compilation and resource estimation for larger curves up to 256-bit:**
 ```bash
 jupyter notebook EC_discrete_log_compilation.ipynb
 ```
-Compiles and counts gates for selected bit sizes (4, 8, 16, 32, 64, 128, 256).
+This notebook is the large-curve scaling notebook. It focuses on compilation and resource estimation for representative generated curves, culminating in the 256-bit case.
 
 **3. Resource estimation for ALL QDay standard curves:**
 ```bash
 jupyter notebook resource_estimation_all_curves.ipynb
 ```
-Compiles and counts gates for every curve in the QDay standard set (4–21 bit) plus larger targets (32, 48, 64, 128, 256 bit). Produces a complete resource table and scaling plots.
+This notebook compiles and counts gates for every curve in the QDay standard set (4–21 bit). It produces the prize-wide resource table and scaling plots for the full challenge set.
 
 **4. Run unit tests:**
 ```bash
@@ -139,13 +144,14 @@ pytest tests/ -v
 - Resource estimation for large bit sizes (128, 256) may take several minutes depending on hardware.
 - The `@count_ops` approach traces a single EC addition and extracts gate counts without simulating the full circuit, making 256-bit estimation feasible on standard hardware.
 - All curves use the equation $y^2 = x^3 + 7 \pmod{p}$ (matching secp256k1 form).
+- The notebook split is intentional: [`resource_estimation_all_curves.ipynb`](resource_estimation_all_curves.ipynb) is for the QDay prize curve set, while [`EC_discrete_log_compilation.ipynb`](EC_discrete_log_compilation.ipynb) is for larger-curve compilation and scaling up to 256-bit.
 
 ## Other Documents
 
 - [`BIGINTEGER_INTEGRATION.md`](BIGINTEGER_INTEGRATION.md) — Detailed technical documentation of the BigInteger integration across the project and Qrisp framework
 - [`pytest-logs-*/`](pytest-logs-20260322-214828/) — Test execution logs from CI/local runs
-- [`EC_discrete_log_compilation.ipynb`](EC_discrete_log_compilation.ipynb) — Resource estimation with scaling analysis and plots
-- [`resource_estimation_all_curves.ipynb`](resource_estimation_all_curves.ipynb) — Comprehensive resource estimation for all QDay standard curves
+- [`EC_discrete_log_compilation.ipynb`](EC_discrete_log_compilation.ipynb) — Compilation and resource estimation for larger curves up to 256-bit
+- [`resource_estimation_all_curves.ipynb`](resource_estimation_all_curves.ipynb) — Compilation and resource estimation for all QDay standard curves
 
 ## License
 
