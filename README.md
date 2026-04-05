@@ -12,7 +12,7 @@ This repository contains a fully compilable, **dynamic** implementation of **Sho
 
 ## Background
 
-I hold a Master's degree in Quantum Science and Engineering from EPFL (graduated June 2025). I am currently working as a researcher in Berlin, and I am a Contributor and Committer to the [Eclipse Foundation's Qrisp project](https://www.qrisp.eu/). My work focuses on quantum algorithm design and compilation, with a particular emphasis on quantum arithmetic and cryptographic applications.
+I hold a Master's degree in Quantum Science and Engineering from EPFL (graduated June 2025). I am currently working as a researcher at HSRM and I am an incoming PhD student in Jens Eisert's group at FU in Berlin. I am a Contributor and Committer to the [Eclipse Foundation's Qrisp project](https://www.qrisp.eu/). My work focuses on quantum algorithm design and fault-tolerant compilation, with a particular emphasis on quantum arithmetic and cryptographic applications.
 
 ## Key Broken
 
