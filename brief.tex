@@ -50,7 +50,7 @@ To make the repository structure explicit, we separate the two resource-estimati
 \section*{Requirements and Execution}
 
 \begin{itemize}[nosep,leftmargin=1.2em]
-    \item \textbf{Software}: Python 3.11+, Qrisp (development branch with PRs \href{https://github.com/eclipse-qrisp/qrisp/pull/495}{\#495} and \href{https://github.com/eclipse-qrisp/qrisp/pull/505}{\#505}, both pending merge), JAX, NumPy, SymPy, Matplotlib.
+    \item \textbf{Software}: Python 3.11+, Qrisp (development branch with PR \href{https://github.com/eclipse-qrisp/qrisp/pull/495}{\#495} for \texttt{QuantumModulus}/\texttt{BigInteger} fixes and compatibility support, and PR \href{https://github.com/eclipse-qrisp/qrisp/pull/505}{\#505} for \texttt{count\_ops} profiling optimization, both pending merge), JAX, NumPy, SymPy, Matplotlib.
     \item \textbf{Hardware}: Standard laptop/desktop. Resource estimation for 256-bit takes minutes; full simulation is limited to small curves ($\leq$5-bit) due to exponential state-space scaling.
     \item \textbf{Execution}: Install via \texttt{pip install -r requirements.txt}. Run \texttt{resource\_estimation\_all\_curves.ipynb} for the full QDay prize curve set, and run \texttt{EC\_discrete\_log\_compilation.ipynb} for compilation and resource estimation on larger curves up to 256-bit.
     \item \textbf{Validation}: Unit tests (\texttt{pytest tests/ -v}) verify correctness of all quantum primitives against classical reference implementations using Qrisp's boolean simulator.

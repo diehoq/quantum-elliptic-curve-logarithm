@@ -52,8 +52,8 @@ Beyond the static approach from the paper, this repository introduces **dynamic 
 
 This project depends on two in-progress Pull Requests on the Qrisp repository (both will be merged soon):
 
-1. **[PR #495](https://github.com/eclipse-qrisp/qrisp/pull/495)** — Core `jasp` (JAX-based quantum compilation) support and BigInteger arithmetic
-2. **[PR #505](https://github.com/eclipse-qrisp/qrisp/pull/505)** — Additional fixes and enhancements for the EC logarithm compilation pipeline
+1. **[PR #495](https://github.com/eclipse-qrisp/qrisp/pull/495)** — Fixes and compatibility support for Qrisp's `QuantumModulus` and `BigInteger` classes
+2. **[PR #505](https://github.com/eclipse-qrisp/qrisp/pull/505)** — Profiling optimizations for `count_ops`
 
 Until these are merged into Qrisp's main branch, install the development branch specified in `requirements.txt`.
 
