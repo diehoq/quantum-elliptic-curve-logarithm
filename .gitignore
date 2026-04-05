@@ -2,3 +2,17 @@ venv/
 test_notebook.ipynb
 **/__pycache__/**
 pytest-logs-*/
+.ipynb_checkpoints/
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+# Generated resource-estimation exports
+resource_estimation_all_curves.csv
+resource_estimation_breakdown.csv
+resource_estimation_plots.png

@@ -1,0 +1,72 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+\setlength{\parskip}{0.4em}
+\setlength{\parindent}{0pt}
+
+\title{\vspace{-2em}\textbf{QDay Prize Submission Brief}\\[0.3em]
+\large End-to-End Compilable Quantum Elliptic Curve Discrete Logarithm}
+\author{Diego Polimeni\\\small\texttt{diego.polimeni.work@gmail.com}}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.5em}
+
+\section*{Approach}
+
+We implement \textbf{Shor's algorithm for the Elliptic Curve Discrete Logarithm Problem (ECDLP)} using \textbf{Qrisp}, a high-level quantum programming language built on top of Qiskit. Given a generator point $G$ and public key $P = kG$ on an elliptic curve $y^2 = x^3 + 7 \pmod{p}$, the algorithm recovers the private key $k$ via quantum phase estimation on the group operation.
+
+The core algorithm prepares two $n$-qubit QPE registers in superposition, performs $2n$ controlled EC point additions (multiplying by both $G$ and $P$), applies inverse QFT, and extracts $k$ from the measurement outcomes via continued-fraction expansion. This follows the standard Shor ECDLP construction described in our paper~\cite{polimeni2025}.
+
+\section*{Techniques and Design Choices}
+
+\textbf{Static circuit compilation.}  
+As detailed in~\cite{polimeni2025}, we realize all EC arithmetic---point addition, point doubling, Kaliski modular inversion, Montgomery modular multiplication---as compilable quantum circuits using Qrisp's \texttt{QuantumModulus} type and in-place modular arithmetic primitives. Every operation is decomposed into elementary gates (H, CNOT, T, T$^\dagger$) at compile time.
+
+\textbf{Dynamic compilation via JAX (\texttt{jasp}).}  
+Beyond the static approach, we introduce \textbf{JAX-traceable dynamic compilation} through Qrisp's \texttt{jasp} subsystem. The quantum algorithm is traced through \texttt{jax.jit}, enabling dynamic circuit generation, loop unrolling, and optimization. This is critical for scaling to large bit sizes where static unrolling would be intractable.
+
+\textbf{BigInteger support.}  
+To handle prime fields exceeding the native 64-bit JAX integer limit, we developed a \texttt{BigInteger} class---a fixed-width array of 32-bit limbs registered as a JAX pytree node. This enables compilation for arbitrarily large primes (up to 256-bit and beyond) while remaining fully JAX-traceable. All classical computation uses Python \texttt{int} values; \texttt{BigInteger} values appear only in \texttt{QuantumModulus} register construction and internal operator dispatch.
+
+\textbf{Scalable resource estimation.}  
+Every controlled EC addition in the Shor loop has \emph{identical gate structure} regardless of the classical point---only the modulus bit-width matters. We exploit this by counting gates for a \emph{single} controlled addition via Qrisp's \texttt{@count\_ops} decorator and computing:
+\[
+\text{Total gates} = 2n \times \text{(single EC addition)} + \text{overhead}
+\]
+where overhead covers Hadamard preparation, initial encoding, inverse QFT, and measurement. This makes 256-bit resource estimation feasible on standard hardware without tracing 512 full EC additions.
+
+To make the repository structure explicit, we separate the two resource-estimation use cases into two notebooks: \texttt{resource\_estimation\_all\_curves.ipynb} compiles all QDay prize curves (4--21 bit), while \texttt{EC\_discrete\_log\_compilation.ipynb} focuses on larger generated curves and the scaling path up to 256-bit.
+
+\section*{Requirements and Execution}
+
+\begin{itemize}[nosep,leftmargin=1.2em]
+    \item \textbf{Software}: Python 3.10+, Qrisp (development branch with PRs \href{https://github.com/eclipse-qrisp/qrisp/pull/495}{\#495} and \href{https://github.com/eclipse-qrisp/qrisp/pull/505}{\#505}, both pending merge), JAX, NumPy, SymPy, Matplotlib.
+    \item \textbf{Hardware}: Standard laptop/desktop. Resource estimation for 256-bit takes minutes; full simulation is limited to small curves ($\leq$5-bit) due to exponential state-space scaling.
+    \item \textbf{Execution}: Install via \texttt{pip install -r requirements.txt}. Run \texttt{resource\_estimation\_all\_curves.ipynb} for the full QDay prize curve set, and run \texttt{EC\_discrete\_log\_compilation.ipynb} for compilation and resource estimation on larger curves up to 256-bit.
+    \item \textbf{Validation}: Unit tests (\texttt{pytest tests/ -v}) verify correctness of all quantum primitives against classical reference implementations using Qrisp's boolean simulator.
+\end{itemize}
+
+\section*{Potential Drawbacks}
+
+\begin{itemize}[nosep,leftmargin=1.2em]
+    \item \textbf{No fault-tolerant hardware execution}: Current quantum hardware cannot execute circuits of this depth. The submission demonstrates correctness and compilation feasibility, not hardware execution.
+    \item \textbf{No T-gate optimization}: The current compilation does not apply T-gate reduction techniques (e.g., T-factory scheduling, magic state distillation budgeting). Gate counts represent unoptimized decompositions.
+    \item \textbf{Qrisp dependency on development branches}: The implementation requires two PRs not yet merged into Qrisp's main branch.
+    \item \textbf{Static point encoding}: The current approach encodes classical EC points statically. Windowed or semi-classical QFT variants could reduce qubit count but are not yet implemented.
+\end{itemize}
+
+\begin{thebibliography}{1}
+\bibitem{polimeni2025} D.~Polimeni, R.~Seidel. \emph{End-to-end compilable implementation of quantum elliptic curve logarithm in Qrisp}. arXiv:2501.10228 (2025).
+\end{thebibliography}
+
+\end{document}
