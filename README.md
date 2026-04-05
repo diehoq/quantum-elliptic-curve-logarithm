@@ -93,7 +93,7 @@ Until these are merged into Qrisp's main branch, install the development branch 
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - A virtual environment is recommended
 
 ### Installation
