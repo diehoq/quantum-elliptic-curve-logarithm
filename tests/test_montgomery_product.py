@@ -37,7 +37,9 @@ def test_standard_form_product_exhaustive(p, no_faulty_uncomputation):
                 if (out, a_out, b_out) != (a_val * b_val % p, a_val, b_val):
                     wrong.append(((a_val, b_val), (out, a_out, b_out)))
 
-    assert not wrong, f"p={p}: wrong (a, b) -> (a*b, a, b) for {len(wrong)} inputs, e.g. {wrong[:3]}"
+    assert not wrong, (
+        f"p={p}: wrong (a, b) -> (a*b, a, b) for {len(wrong)} inputs, e.g. {wrong[:3]}"
+    )
 
 
 @pytest.mark.parametrize("p", [3, 5, 7, 11, 13, 17, 257, 65537, 2**255 - 19, 2**256 - 2**32 - 977])

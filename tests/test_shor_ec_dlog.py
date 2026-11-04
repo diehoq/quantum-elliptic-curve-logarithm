@@ -9,7 +9,9 @@ Initial ancilla point P0 = (3, 2)
 We build the quantum circuit (without running full simulation)
 and verify the classical pieces are consistent.
 """
+
 import qrisp
+
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
 
@@ -23,9 +25,7 @@ def test_shor_ec_dlog_circuit_builds():
     P = [3, 3]
 
     # Classical sanity: verify discrete log exists
-    k_cl = clECarithm.compute_logarithm(
-        clECarithm.EllPoint(*G), clECarithm.EllPoint(*P), curve
-    )
+    k_cl = clECarithm.compute_logarithm(clECarithm.EllPoint(*G), clECarithm.EllPoint(*P), curve)
     assert k_cl is not None, f"No discrete log found for P={P} on curve"
     assert k_cl == 4, f"Expected k=4, got k={k_cl}"
 

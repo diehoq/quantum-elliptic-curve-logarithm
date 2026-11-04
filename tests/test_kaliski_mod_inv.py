@@ -1,14 +1,14 @@
-import src.quantum.ec_arithmetic as qECarithm
 import pytest
 import qrisp
-from qrisp import measure, QuantumModulus, QuantumArray, QuantumBool, boolean_simulation
+from qrisp import QuantumArray, QuantumBool, QuantumModulus, boolean_simulation, measure
 from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
 
-
+import src.quantum.ec_arithmetic as qECarithm
 
 primes = [3, 5, 7, 11, 13, 17, 19, 23]
 BI_SIZE = 1
 BIGINT_PRIMES = [7, 13]
+
 
 @pytest.mark.parametrize("v_cl", range(1, 23))
 @pytest.mark.parametrize("p", primes)
@@ -26,9 +26,10 @@ def test_kaliski_mod_inv(v_cl, p):
     m = qrisp.QuantumArray(qtype=qrisp.QuantumBool(), shape=(2 * p.bit_length(),))
 
     qECarithm.kaliski_mod_inv(v, p, m)
-    assert v.get_measurement() == {
-        expected_inverse: 1
-    }, f"Quantum inverse did not match expected {expected_inverse} for v_cl={v_cl}, p={p}"
+    assert v.get_measurement() == {expected_inverse: 1}, (
+        f"Quantum inverse did not match expected {expected_inverse} for v_cl={v_cl}, p={p}"
+    )
+
 
 @pytest.mark.parametrize("p", primes)
 def test_kaliski_mod_inv_dynamic(p):

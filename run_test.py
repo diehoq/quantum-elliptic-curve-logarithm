@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Quick smoke test for BigInteger compatibility."""
-import sys
-sys.path.insert(0, '.')
 
-print("Importing modules...")
+import warnings
+
 import qrisp
+from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
+
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
-from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
 
 CURVE = clECarithm.EllCurve(a=5, b=4, p=7)
 P = (3, 5)
@@ -30,7 +30,8 @@ print("PASS")
 
 # Test 2: boolean_simulation (int modulus, k=1, n_bits=1)
 print("\n=== Test 2: boolean_simulation int modulus, k=1, n_bits=1 ===")
-import warnings
+
+
 @qrisp.boolean_simulation
 def run_int():
     res_0 = qrisp.QuantumModulus(7)
@@ -41,6 +42,7 @@ def run_int():
     k[:] = 1
     result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE, n_bits=1)
     return qrisp.measure(result[0]), qrisp.measure(result[1])
+
 
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")
@@ -57,6 +59,7 @@ BI_SIZE = 1
 p_bi = BigInteger.create_static(7, BI_SIZE)
 CURVE_BI = clECarithm.EllCurve(a=5, b=4, p=p_bi)
 
+
 @qrisp.boolean_simulation
 def run_bi():
     res_0 = qrisp.QuantumModulus(p_bi)
@@ -67,6 +70,7 @@ def run_bi():
     k[:] = 1
     result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE_BI, n_bits=1)
     return qrisp.measure(result[0]), qrisp.measure(result[1])
+
 
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")

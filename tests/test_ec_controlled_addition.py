@@ -1,23 +1,22 @@
+import pytest
+import qrisp
+
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
-import qrisp
-import pytest
-
 
 # Smoke test: p=7, y²=x³+5x+4, P=(0,2), G=(3,5)
 P = (0, 2)
 G = (3, 5)
 CURVE = clECarithm.EllCurve(a=5, b=4, p=7)
-R = clECarithm.ell_add_generic(
-    clECarithm.EllPoint(*P), clECarithm.EllPoint(*G), CURVE
-)
+R = clECarithm.ell_add_generic(clECarithm.EllPoint(*P), clECarithm.EllPoint(*G), CURVE)
 
 # Boolean simulation tests params:
 P_BS = (0, 2)
 G_BS = (3, 5)
 P_BS_p = 7
 R_BS = clECarithm.ell_add_generic(
-    clECarithm.EllPoint(*P_BS), clECarithm.EllPoint(*G_BS),
+    clECarithm.EllPoint(*P_BS),
+    clECarithm.EllPoint(*G_BS),
     clECarithm.EllCurve(a=5, b=4, p=P_BS_p),
 )
 
@@ -35,9 +34,7 @@ def test_controlled_addition_ctrl_on():
         qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G), CURVE.p)
 
     result = qrisp.multi_measurement([anc_0, anc_1])
-    assert result == {(R.x, R.y): 1}, (
-        f"ctrl=1: expected ({R.x}, {R.y}), got {result}"
-    )
+    assert result == {(R.x, R.y): 1}, f"ctrl=1: expected ({R.x}, {R.y}), got {result}"
 
 
 def test_controlled_addition_ctrl_off():
@@ -53,9 +50,7 @@ def test_controlled_addition_ctrl_off():
         qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G), CURVE.p)
 
     result = qrisp.multi_measurement([anc_0, anc_1])
-    assert result == {(P[0], P[1]): 1}, (
-        f"ctrl=0: expected ({P[0]}, {P[1]}), got {result}"
-    )
+    assert result == {(P[0], P[1]): 1}, f"ctrl=0: expected ({P[0]}, {P[1]}), got {result}"
 
 
 @pytest.mark.parametrize(
@@ -77,12 +72,12 @@ def test_controlled_addition_explicit_ctrl_kwarg(ctrl_value, expected):
     qECarithm.q_ec_add_inpl([anc_0, anc_1], list(G), CURVE.p, ctrl=ctrl[0])
 
     result = qrisp.multi_measurement([anc_0, anc_1])
-    assert result == {expected: 1}, (
-        f"explicit ctrl={ctrl_value}: expected {expected}, got {result}"
-    )
+    assert result == {expected: 1}, f"explicit ctrl={ctrl_value}: expected {expected}, got {result}"
+
 
 def test_controlled_addition_boolean_sim(no_faulty_uncomputation):
     """Test ctrl=|0> and ctrl=|1> under one cached @boolean_simulation circuit."""
+
     # callback_threshold=500 keeps XLA compile time manageable (Qrisp default: inline all)
     @qrisp.boolean_simulation(callback_threshold=500)
     def run(ctrl_value):
@@ -108,8 +103,7 @@ def test_controlled_addition_boolean_sim(no_faulty_uncomputation):
             rx, ry = run(ctrl_value)
 
         assert (int(rx), int(ry)) == expected, (
-            f"{label} boolean_sim: got ({int(rx)}, {int(ry)}), "
-            f"expected {expected}"
+            f"{label} boolean_sim: got ({int(rx)}, {int(ry)}), expected {expected}"
         )
 
 
@@ -129,12 +123,8 @@ def test_controlled_addition_ctrl_superposition():
     results = qrisp.multi_measurement([ctrl, anc_0, anc_1])
     expected_probability = 0.5
     # ctrl=False → P unchanged, ctrl=True → P+G
-    assert (False, P[0], P[1]) in results, (
-        f"Missing ctrl=0 outcome (P unchanged): {results}"
-    )
-    assert (True, R.x, R.y) in results, (
-        f"Missing ctrl=1 outcome (P+G): {results}"
-    )
+    assert (False, P[0], P[1]) in results, f"Missing ctrl=0 outcome (P unchanged): {results}"
+    assert (True, R.x, R.y) in results, f"Missing ctrl=1 outcome (P+G): {results}"
     assert results[(False, P[0], P[1])] == pytest.approx(expected_probability, abs=1e-6), (
         f"Unexpected probability for ctrl=0 branch: got {results[(False, P[0], P[1])]}, "
         f"expected {expected_probability}"
