@@ -1,25 +1,28 @@
 version: 2
 updates:
+  # Python: security updates only. Results depend on exact versions and Qrisp caps
+  # several core packages, so routine version bumps are done by hand.
+  # open-pull-requests-limit: 0 disables version updates; security updates still run.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
-    groups:
-      python-minor-and-patch:
-        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 0
     ignore:
-      # Pinned to a specific commit of the eclipse-qrisp/Qrisp fix branch; bump manually.
+      # Pinned to a specific commit of eclipse-qrisp/Qrisp main; bump manually.
       - dependency-name: "qrisp"
-      # Qrisp requires flask<2.3.0, and Flask 2.2 does not work with Werkzeug 3.
-      - dependency-name: "flask"
-        versions: [">=2.3.0"]
-      - dependency-name: "werkzeug"
-        versions: [">=3.0.0"]
-      # Qrisp pins jax/jaxlib==0.7.1 and sympy<=1.13.
+      # Caps from Qrisp's pyproject.toml.
       - dependency-name: "jax"
       - dependency-name: "jaxlib"
+      - dependency-name: "numpy"
+        versions: [">=2.5"]
+      - dependency-name: "qiskit"
+        versions: [">=2.6"]
       - dependency-name: "sympy"
         versions: [">1.13"]
+      # sympy 1.13 requires mpmath<1.4.
+      - dependency-name: "mpmath"
+        versions: [">=1.4"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

@@ -186,10 +186,8 @@ def test_ec_addition_superposition(curve_data):
 
 
 @pytest.mark.parametrize("curve_data", curves_with_points)
-def test_ec_addition_dynamic(curve_data):
+def test_ec_addition_dynamic(curve_data, no_faulty_uncomputation):
     """Test EC addition under @boolean_simulation (dynamic/JAX mode)."""
-    import warnings
-
     curve_params = curve_data["curve_params"]
     points = curve_data["points"]
     base_point_coords = curve_data["base_point"]
@@ -202,7 +200,8 @@ def test_ec_addition_dynamic(curve_data):
     base_point_qrisp = list(base_point_coords)
     p = curve_params["p"]
 
-    @qrisp.boolean_simulation
+    # callback_threshold=500 keeps XLA compile time manageable (Qrisp default: inline all)
+    @qrisp.boolean_simulation(callback_threshold=500)
     def run_addition(point_x, point_y):
         anc_0 = qrisp.QuantumModulus(p)
         anc_0[:] = point_x
@@ -215,14 +214,9 @@ def test_ec_addition_dynamic(curve_data):
         P_ell = clECarithm.EllPoint(point[0], point[1])
         result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
 
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with no_faulty_uncomputation(f"point {point}"):
             rx, ry = run_addition(point[0], point[1])
 
-        faulty = [w for w in caught if "Faulty" in str(w.message)]
-        assert (
-            len(faulty) == 0
-        ), f"Faulty uncomputation for point {point}: {[str(w.message) for w in faulty]}"
         assert (int(rx), int(ry)) == (result_ell.x, result_ell.y), (
             f"Dynamic mode mismatch for point {point} on curve a={curve.a}, b={curve.b}, p={p}: "
             f"got ({int(rx)}, {int(ry)}), expected ({result_ell.x}, {result_ell.y})"

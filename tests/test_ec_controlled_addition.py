@@ -1,5 +1,3 @@
-import warnings
-
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
 import qrisp
@@ -83,9 +81,10 @@ def test_controlled_addition_explicit_ctrl_kwarg(ctrl_value, expected):
         f"explicit ctrl={ctrl_value}: expected {expected}, got {result}"
     )
 
-def test_controlled_addition_boolean_sim():
+def test_controlled_addition_boolean_sim(no_faulty_uncomputation):
     """Test ctrl=|0> and ctrl=|1> under one cached @boolean_simulation circuit."""
-    @qrisp.boolean_simulation
+    # callback_threshold=500 keeps XLA compile time manageable (Qrisp default: inline all)
+    @qrisp.boolean_simulation(callback_threshold=500)
     def run(ctrl_value):
         ctrl = qrisp.QuantumBool()
         ctrl[:] = ctrl_value
@@ -105,15 +104,9 @@ def test_controlled_addition_boolean_sim():
     ]
 
     for ctrl_value, expected, label in cases:
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with no_faulty_uncomputation(label):
             rx, ry = run(ctrl_value)
 
-        faulty = [w for w in caught if "Faulty" in str(w.message)]
-        assert len(faulty) == 0, (
-            f"Faulty uncomputation warnings for {label}: "
-            f"{[str(w.message) for w in faulty]}"
-        )
         assert (int(rx), int(ry)) == expected, (
             f"{label} boolean_sim: got ({int(rx)}, {int(ry)}), "
             f"expected {expected}"

@@ -1,3 +1,5 @@
+import contextlib
+import functools
 import math
 import numpy as np
 from qrisp import (
@@ -313,135 +315,156 @@ def q_ec_double(P, curve):
     return [xr, (p_i - yr) % p_i]
 
 
-@custom_control
+def montgomery_reduction_shift(p_int):
+    """Return the reduction shift ``m`` of Qrisp's quantum-quantum Montgomery product.
+
+    Multiplying two ``QuantumModulus`` registers yields ``a * b * 2**(-m)``
+    with ``m = ceil(log2((p - 1)**2)) + 1 - ceil(log2(p))``. Qrisp computes this
+    in ``montgomery_mod_mul`` (static) and ``qq_montgomery_multiply_modulus``
+    (jasp). The formula is duplicated here because the injection operator
+    (``<<``) does not propagate the product's ``.m``. If the two ever drift
+    apart, every product is off by a constant power of two;
+    ``tests/test_montgomery_product.py`` guards against that.
+    """
+
+    # Exact integer ceil(log2(x)), matching Qrisp's smallest_power_of_two
+    # (floats lose precision for 256-bit primes).
+    def ceil_log2(x):
+        return (x - 1).bit_length() if x > 1 else 0
+
+    return ceil_log2((p_int - 1) ** 2) + 1 - ceil_log2(p_int)
+
+
 def q_ec_add_inpl(anc, G, p, ctrl=None):
-    # return the result of P + Q
-    # Following C3 in the paper
-    # Recover p from quantum register's modulus (may be BigInteger or int)
-    p_raw = anc[0].modulus
-    p_i = _p_int(p_raw)
-    use_bi = isinstance(p_raw, BigInteger)
-    mul_func = lambda x, y: x * y
+    """In place, (anc[0], anc[1]) := (anc[0], anc[1]) + G, optionally controlled.
 
-    # Montgomery reduction shift: injection (<<) doesn't propagate .m from
-    # the multiplication result, so we set it manually after each injection.
-    n_bits = p_i.bit_length()
-    m_red = math.ceil(math.log2((p_i - 1) ** 2) + 1) - n_bits
+    ``G`` is a classical point. ``p`` is the field prime as an int or a
+    BigInteger with concrete digits. Exceptional cases (anc = ±G, or
+    anc + G = ±G) are not handled; see the affine-addition literature.
+    """
+    # Qrisp traces QuantumModulus.modulus inside qached functions, so resolve
+    # the prime to a concrete Python int here. It reaches the kernel through a
+    # closure rather than a static argument: custom_control traces the
+    # controlled version without honouring static_argnames.
+    kernel = _ec_add_kernel(_p_int(p))
+    kwargs = {} if ctrl is None else {"ctrl": ctrl}
+    return kernel(anc, G, **kwargs)
 
-    # Precompute constants for manual to_standard / to_montgomery.
+
+@functools.cache
+def _ec_add_kernel(p_int):
+    """Build (once per prime) the custom-controlled in-place point addition."""
+
+    @custom_control
+    def kernel(anc, G, ctrl=None):
+        _q_ec_add_inpl_body(anc, G, p_int, ctrl)
+
+    return kernel
+
+
+@contextlib.contextmanager
+def standard_form_product(a, b, p_mod, p_int):
+    """Temporarily hold ``a * b mod p`` in standard form; uncomputed on exit.
+
+    Qrisp's quantum-quantum product returns ``a * b * 2**(-m)`` (Montgomery
+    form). Inside the ``with`` block the yielded register holds the plain
+    product, so it can be XOR-copied or added into other registers. ``p_mod``
+    is the modulus for the temporary register (int or BigInteger matching the
+    operands), ``p_int`` the same prime as a Python int.
+    """
+    m_red = montgomery_reduction_shift(p_int)
+    # Apply the to_standard / to_montgomery conversions manually:
     # conjugate(to_standard_qm) has a faulty-uncomputation bug under
-    # boolean_simulation, so we apply the conversion manually.
-    fwd_const = pow(2, m_red, p_i)  # to_standard multiplier (int; encoder handles BigInteger)
-    rev_const = pow(2, -m_red, p_i)  # to_montgomery multiplier (int; encoder handles BigInteger)
+    # boolean_simulation. The int constants are encoded to BigInteger by
+    # QuantumModulus when needed.
+    fwd_const = pow(2, m_red, p_int)
+    rev_const = pow(2, -m_red, p_int)
 
-    # G values are used as classical constants in quantum ops.
-    # When modulus is BigInteger, the QuantumModulus operators handle
-    # the int-to-BigInteger conversion automatically via __rmod__.
-
-    if ctrl is None:
-        anc[1] -= G[1]
-    else:
-        with control(ctrl):
-            anc[1] -= G[1]  # step 2 //ctrl_sub_const_modp
-    anc[0] -= G[0]  # step 1
-
-    m = QuantumArray(qtype=QuantumBool(), shape=(2 * n_bits,))
-    l = QuantumModulus(p_raw, inpl_adder=anc[0].inpl_adder)
-    # step 3 & 4 & 6: compute (anc[1] * kaliski_inv(anc[0])) in standard form -> l
-    with conjugate(kaliski_mod_inv)(anc[0], p_i, m):
-        temp = QuantumModulus(p_raw)
-        injected_mul = temp << mul_func
-        with conjugate(injected_mul)(anc[1], anc[0]):
-            temp.m = -m_red
-            temp *= fwd_const
-            temp.m = 0
-            cx(temp, l)  # copy standard value
-            temp *= rev_const
-            temp.m = -m_red
-        temp.delete()
-    m.delete()
-
-    # step 5: anc[1] -= l * anc[0] (in standard form)
-    temp = QuantumModulus(p_raw)
-    injected_mul = temp << mul_func
-    with conjugate(injected_mul)(l, anc[0]):
+    temp = QuantumModulus(p_mod)
+    injected_mul = temp << (lambda x, y: x * y)
+    with conjugate(injected_mul)(a, b):
+        # Injection (<<) doesn't propagate .m from the product, so set it.
         temp.m = -m_red
         temp *= fwd_const
         temp.m = 0
-        anc[1] -= temp
+        yield temp
         temp *= rev_const
         temp.m = -m_red
     temp.delete()
 
-    if ctrl is None:
-        anc[0] += G[0] * 3
-    else:
-        with control(ctrl):
-            anc[0] += G[0] * 3  # step 9 //ctrl_add_const_modp
 
-    # step 7 & 8: anc[0] -= l * l (in standard form)
-    # Use a copy of l for the second factor because the injection mechanism
-    # produces incorrect results when the same QuantumVariable is passed
-    # for both arguments under boolean_simulation (JAX tracing).
-    l_copy = QuantumModulus(p_raw, inpl_adder=l.inpl_adder)
-    cx(l, l_copy)
-    temp = QuantumModulus(p_raw)
-    injected_mul = temp << mul_func
-    with conjugate(injected_mul)(l, l_copy):
-        temp.m = -m_red
-        temp *= fwd_const
-        temp.m = 0
+def _q_ec_add_inpl_body(anc, G, p_int, ctrl):
+    # Following C3 in the paper.
+    # Build new registers from the concrete prime (an int, or a BigInteger with the
+    # same limb count as anc's modulus) instead of the traced anc[0].modulus.
+    p_i = p_int
+    p_raw = _bi(p_i, anc[0].modulus)
+    n_bits = p_i.bit_length()
+
+    def controlled(op):
         if ctrl is None:
-            anc[0] -= temp  # step 8
+            op()
         else:
             with control(ctrl):
-                anc[0] -= temp  # step 8 //ctrl_sub_modp
-        temp *= rev_const
-        temp.m = -m_red
-    temp.delete()  # step 10
-    cx(l, l_copy)
-    l_copy.delete()
+                op()
 
-    # step 11: anc[1] += l * anc[0] (in standard form)
-    temp = QuantumModulus(p_raw)
-    injected_mul = temp << mul_func
-    with conjugate(injected_mul)(l, anc[0]):
-        temp.m = -m_red
-        temp *= fwd_const
-        temp.m = 0
-        anc[1] += temp
-        temp *= rev_const
-        temp.m = -m_red
-    temp.delete()
+    # G values are classical constants; QuantumModulus encodes them to
+    # BigInteger when the modulus is a BigInteger.
+    def sub_g1():
+        anc[1] -= G[1]
 
-    # step 12-14: uncompute l via second kaliski inversion
+    controlled(sub_g1)  # step 2 //ctrl_sub_const_modp
+    anc[0] -= G[0]  # step 1
+
+    # step 3 & 4 & 6: l = anc[1] * kaliski_inv(anc[0]) in standard form
     m = QuantumArray(qtype=QuantumBool(), shape=(2 * n_bits,))
+    l = QuantumModulus(p_raw, inpl_adder=anc[0].inpl_adder)
     with conjugate(kaliski_mod_inv)(anc[0], p_i, m):
-        temp = QuantumModulus(p_raw)
-        injected_mul = temp << mul_func
-        with conjugate(injected_mul)(anc[1], anc[0]):
-            temp.m = -m_red
-            temp *= fwd_const
-            temp.m = 0
-            cx(temp, l)  # XOR cancels: l ^= standard_temp, l becomes 0
-            temp *= rev_const
-            temp.m = -m_red
-        temp.delete()
+        with standard_form_product(anc[1], anc[0], p_raw, p_i) as temp:
+            cx(temp, l)
     m.delete()
 
+    # step 5: anc[1] -= l * anc[0]
+    with standard_form_product(l, anc[0], p_raw, p_i) as temp:
+        anc[1] -= temp
+
+    def add_3g0():
+        anc[0] += G[0] * 3
+
+    controlled(add_3g0)  # step 9 //ctrl_add_const_modp
+
+    # step 7 & 8: anc[0] -= l * l
+    # Use a copy of l for the second factor: Qrisp's quantum-quantum product
+    # does not support passing the same register as both operands.
+    l_copy = QuantumModulus(p_raw, inpl_adder=l.inpl_adder)
+    cx(l, l_copy)
+    with standard_form_product(l, l_copy, p_raw, p_i) as temp:
+
+        def sub_l_squared():
+            anc[0] -= temp
+
+        controlled(sub_l_squared)  # step 8 //ctrl_sub_modp
+    cx(l, l_copy)  # step 10
+    l_copy.delete()
+
+    # step 11: anc[1] += l * anc[0]
+    with standard_form_product(l, anc[0], p_raw, p_i) as temp:
+        anc[1] += temp
+
+    # step 12-14: uncompute l via a second Kaliski inversion
+    m = QuantumArray(qtype=QuantumBool(), shape=(2 * n_bits,))
+    with conjugate(kaliski_mod_inv)(anc[0], p_i, m):
+        with standard_form_product(anc[1], anc[0], p_raw, p_i) as temp:
+            cx(temp, l)  # XOR cancels: l becomes 0
+    m.delete()
     l.delete()
-    if ctrl is None:
-        anc[1] -= G[1]  # step 16
-    else:
-        with control(ctrl):
-            anc[1] -= G[1]  # step 16 //ctrl_sub_const_modp
 
-    if ctrl is None:
-        inpl_rsub(anc[0], p_i, mod_int=p_i)  # step 15
-    else:
-        with control(ctrl):
-            inpl_rsub(anc[0], p_i, mod_int=p_i)  # step 15 //ctrl_neg_modp
+    controlled(sub_g1)  # step 16 //ctrl_sub_const_modp
 
+    def negate_x():
+        inpl_rsub(anc[0], p_i, mod_int=p_i)
+
+    controlled(negate_x)  # step 15 //ctrl_neg_modp
     anc[0] += G[0]  # step 17 (unconditional: undoes step 1)
 
 

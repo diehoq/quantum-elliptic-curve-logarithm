@@ -22,10 +22,3 @@ on Qrisp's simulator. It does not run a service or handle credentials. In scope:
 
 The keys in `curves_and_keys.json` are the public QDay Prize challenge instances. They
 are not secrets.
-
-## Known, accepted advisories
-
-Qrisp requires `flask<2.3.0`, so `Flask` (2.2.5) and `Werkzeug` (2.3.8, the newest
-version compatible with Flask 2.2) are held below their patched releases. Only Qrisp's
-optional `BackendServer` uses Flask, and this project never starts it, so these
-advisories cannot be reached here.
