@@ -32,7 +32,8 @@ def test_kaliski_mod_inv(v_cl, p):
 
 @pytest.mark.parametrize("p", primes)
 def test_kaliski_mod_inv_dynamic(p):
-    @boolean_simulation
+    # callback_threshold=500 keeps XLA compile time manageable (Qrisp default: inline all)
+    @boolean_simulation(callback_threshold=500)
     def main(v_cl):
         v = QuantumModulus(p)
         v[:] = v_cl
@@ -86,7 +87,8 @@ def test_kaliski_mod_inv_superposition(p):
 def test_kaliski_mod_inv_biginteger_dynamic(p):
     p_bi = BigInteger.create_static(p, BI_SIZE)
 
-    @boolean_simulation
+    # callback_threshold=500 keeps XLA compile time manageable (Qrisp default: inline all)
+    @boolean_simulation(callback_threshold=500)
     def main(v_cl):
         v = QuantumModulus(p_bi)
         v[:] = v_cl

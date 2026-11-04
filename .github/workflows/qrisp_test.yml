@@ -15,6 +15,7 @@ jobs:
       matrix:
         python-version: ["3.12"]
         test_file:
+          - tests/test_montgomery_product.py
           - tests/test_ec_addition.py
           - tests/test_ec_controlled_addition.py
           - tests/test_ec_doubling.py

@@ -50,14 +50,12 @@ Beyond the static approach from the paper, this repository introduces **dynamic 
 
 ## Qrisp Dependencies
 
-This project depends on two in-progress Pull Requests on the Qrisp repository:
+This project builds on two Qrisp pull requests, both merged into Qrisp `main` in June 2026:
 
 1. **[PR #495](https://github.com/eclipse-qrisp/qrisp/pull/495)** — Fixes and compatibility support for Qrisp's `QuantumModulus` and `BigInteger` classes
 2. **[PR #505](https://github.com/eclipse-qrisp/qrisp/pull/505)** — Profiling optimizations for `count_ops`
 
-For this repository, these fixes are bundled in the temporary upstream branch [`fix-qq-montgomery-multiply-pr505`](https://github.com/eclipse-qrisp/Qrisp/tree/fix-qq-montgomery-multiply-pr505) on [`eclipse-qrisp/Qrisp`](https://github.com/eclipse-qrisp/Qrisp). That branch is only used to run this project while the two changes live separately; it is not intended to be merged into `main` as a single combined branch.
-
-`requirements.txt` installs Qrisp directly from that branch, so a normal `pip install -r requirements.txt` is sufficient. If you prefer a manual checkout, clone that branch and install it with `pip install -e`.
+`requirements.txt` pins Qrisp to a specific commit of upstream [`eclipse-qrisp/Qrisp`](https://github.com/eclipse-qrisp/Qrisp) `main`, so a normal `pip install -r requirements.txt` is sufficient. The pin is a commit SHA rather than a branch so that installs are reproducible. Bump it deliberately and run the tests when you need a newer Qrisp.
 
 ## Repository Structure
 
@@ -65,7 +63,7 @@ For this repository, these fixes are bundled in the temporary upstream branch [`
 ├── README.md                        # This file
 ├── brief.pdf                        # 2-page technical brief (QDay Prize requirement)
 ├── curves_and_keys.json             # QDay Prize standard curves (4–21 bit)
-├── requirements.txt                 # Python dependencies (incl. temporary upstream Qrisp branch)
+├── requirements.txt                 # Pinned Python dependencies (Qrisp pinned to an upstream commit)
 ├── pyproject.toml                   # Project configuration
 │
 ├── Shor_EC_discrete_log.ipynb       # Full Shor ECDLP algorithm (small example)
@@ -81,6 +79,8 @@ For this repository, these fixes are bundled in the temporary upstream branch [`
 │       └── ec_arithmetic.py         # Quantum EC arithmetic (Qrisp implementation)
 │
 ├── tests/                           # Unit tests for all quantum primitives
+│   ├── conftest.py                  # Shared fixtures (faulty-uncomputation guard)
+│   ├── test_montgomery_product.py
 │   ├── test_ec_addition.py
 │   ├── test_ec_controlled_addition.py
 │   ├── test_ec_doubling.py
@@ -110,17 +110,18 @@ cd quantum-elliptic-curve-logarithm
 python -m venv venv
 source venv/bin/activate
 
-# Install dependencies (installs Qrisp from eclipse-qrisp/Qrisp@fix-qq-montgomery-multiply-pr505)
+# Install dependencies (installs Qrisp from a pinned commit of eclipse-qrisp/Qrisp main)
 pip install -r requirements.txt
 
 # Install the project in development mode
 pip install -e .
 ```
 
-If you want to run the project from an explicit local Qrisp checkout instead of the dependency entry in `requirements.txt`, use the same temporary upstream branch:
+If you want to run the project from a local Qrisp checkout instead of the dependency entry in `requirements.txt`, check out the commit pinned there:
 
 ```bash
-git clone -b fix-qq-montgomery-multiply-pr505 https://github.com/eclipse-qrisp/Qrisp.git ../Qrisp
+git clone https://github.com/eclipse-qrisp/Qrisp.git ../Qrisp
+git -C ../Qrisp checkout "$(sed -n 's/^qrisp @ .*@//p' requirements.txt)"
 pip install -r requirements.txt
 pip install --no-deps -e ../Qrisp
 pip install -e .

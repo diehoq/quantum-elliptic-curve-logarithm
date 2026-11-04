@@ -2,7 +2,6 @@ import qrisp
 import pytest
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
-import warnings
 from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
 from qrisp.jasp import make_jaspr
 
@@ -43,7 +42,7 @@ def test_ell_mult_add(k_val, n_bits):
     )
 
 
-def test_ell_mult_add_dynamic():
+def test_ell_mult_add_dynamic(no_faulty_uncomputation):
     """Test Q + k*P under @boolean_simulation.
 
     q_ec_mult_add currently expects the QuantumFloat input to be fixed at trace
@@ -63,7 +62,8 @@ def test_ell_mult_add_dynamic():
             clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), k_val, CURVE
         )
 
-        @qrisp.boolean_simulation
+        # callback_threshold=500 keeps XLA compile time manageable (Qrisp default: inline all)
+        @qrisp.boolean_simulation(callback_threshold=500)
         def run_mult_add():
             res_0 = qrisp.QuantumModulus(p)
             res_0[:] = Q[0]
@@ -76,15 +76,9 @@ def test_ell_mult_add_dynamic():
             result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE, n_bits=n_bits)
             return qrisp.measure(result[0]), qrisp.measure(result[1])
 
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with no_faulty_uncomputation(f"k={k_val}, n_bits={n_bits}"):
             rx, ry = run_mult_add()
 
-        faulty = [w for w in caught if "Faulty" in str(w.message)]
-        assert len(faulty) == 0, (
-            f"Faulty uncomputation warnings for k={k_val}, n_bits={n_bits}: "
-            f"{[str(w.message) for w in faulty]}"
-        )
         assert (int(rx), int(ry)) == (expected.x, expected.y), (
             f"k={k_val}, n_bits={n_bits}: expected ({expected.x}, {expected.y}), "
             f"got ({int(rx)}, {int(ry)})"
