@@ -2,11 +2,35 @@ name: Qrisp elliptic curve unit tests via Pytest
 
 on: [push]
 
-# Least privilege: the tests only need to read the repository.
+# Least privilege: the jobs only need to read the repository.
 permissions:
   contents: read
 
+# The test jobs are long; a new push to the same branch cancels the superseded run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Third-party actions are pinned to full commit SHAs (tag in comment).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        # Keep in step with required-version in pyproject.toml.
+        run: python -m pip install ruff==0.17.0
+      - name: Lint
+        run: ruff check --output-format=github .
+      - name: Check formatting
+        run: ruff format --check .
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -23,12 +47,11 @@ jobs:
           - tests/test_kaliski_mod_inv.py
 
     steps:
-      # Third-party actions are pinned to full commit SHAs (tag in comment).
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies

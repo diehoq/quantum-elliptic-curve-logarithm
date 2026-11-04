@@ -1,30 +1,26 @@
 import contextlib
 import functools
-import math
+
 import numpy as np
 from qrisp import (
-    QuantumBool,
-    QuantumModulus,
-    QuantumFloat,
     QuantumArray,
-    swap,
-    control,
+    QuantumBool,
+    QuantumFloat,
+    QuantumModulus,
     conjugate,
+    control,
+    custom_control,
+    cx,
     invert,
     jrange,
     mcx,
-    cx,
-    x,
     merge,
-    singular_shift,
-    custom_control,
     qache,
+    singular_shift,
+    swap,
+    x,
 )
 from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
-from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_mod_tools import (
-    modinv as bi_modinv,
-    smallest_power_of_two,
-)
 
 
 def _p_int(p):
@@ -152,9 +148,7 @@ def kaliski_mod_inv(v, p, m):
         for start in range(0, width, chunk_size):
             stop = min(start + chunk_size, width)
             flag = QuantumBool()
-            ctrl_state = "".join(
-                "1" if (value >> bit) & 1 else "0" for bit in range(start, stop)
-            )
+            ctrl_state = "".join("1" if (value >> bit) & 1 else "0" for bit in range(start, stop))
             mcx([qf[bit] for bit in range(start, stop)], flag, ctrl_state=ctrl_state)
             chunk_flags.append((flag, start, stop, ctrl_state))
 
@@ -483,6 +477,7 @@ def q_ec_mult_add(power, res, k, curve, n_bits=None):
     # Under JAX tracing all QVs share a single TracingQuantumSession,
     # so merge is a no-op.  Calling it would trigger __iter__ on dynamic QVs.
     from qrisp.jasp import check_for_tracing_mode
+
     if not check_for_tracing_mode():
         merge(res[0], res[1], k)
 
@@ -497,8 +492,10 @@ def q_ec_mult_add(power, res, k, curve, n_bits=None):
         # BigIntegers so they don't overflow JAX's int64 during tracing.
         if isinstance(p, BigInteger):
             bi_size = p.digits.shape[0]
-            g_i = (BigInteger.create_static(int(powers[i][0]), bi_size),
-                   BigInteger.create_static(int(powers[i][1]), bi_size))
+            g_i = (
+                BigInteger.create_static(int(powers[i][0]), bi_size),
+                BigInteger.create_static(int(powers[i][1]), bi_size),
+            )
         else:
             g_i = powers[i]
         q_ec_add_inpl(res, g_i, p, ctrl=k[i])

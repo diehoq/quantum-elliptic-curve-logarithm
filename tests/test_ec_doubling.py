@@ -1,6 +1,7 @@
+import pytest
+
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
-import pytest
 
 curves_with_points = [
     {
@@ -83,9 +84,7 @@ def test_ec_doubling(curve_data):
     curve_params = curve_data["curve_params"]
     points = curve_data["points"]
 
-    curve = clECarithm.EllCurve(
-        a=curve_params["a"], b=curve_params["b"], p=curve_params["p"]
-    )
+    curve = clECarithm.EllCurve(a=curve_params["a"], b=curve_params["b"], p=curve_params["p"])
 
     for point in points:
         point_ell = clECarithm.EllPoint(point[0], point[1])
