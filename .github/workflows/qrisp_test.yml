@@ -2,6 +2,10 @@ name: Qrisp elliptic curve unit tests via Pytest
 
 on: [push]
 
+# Least privilege: the tests only need to read the repository.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,9 +22,12 @@ jobs:
           - tests/test_kaliski_mod_inv.py
 
     steps:
-      - uses: actions/checkout@v3
+      # Third-party actions are pinned to full commit SHAs (tag in comment).
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
@@ -28,5 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Test with pytest
+        env:
+          TEST_FILE: ${{ matrix.test_file }}
         run: |
-          pytest ${{ matrix.test_file }}
+          pytest "$TEST_FILE"
