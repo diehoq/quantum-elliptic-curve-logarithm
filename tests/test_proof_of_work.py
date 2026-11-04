@@ -11,14 +11,15 @@ Tier 2 — Resource estimation: build the Shor circuit and compile it to
 Tier 3 — Functional simulation: run Shor end-to-end on the 4-bit curve.
 Tier 4 — JASP simulation: run the same 4-bit instance through @jaspify.
 """
+
 import json
 import os
 
-import qrisp
 import pytest
+import qrisp
+
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
-
 
 # ---------------------------------------------------------------------------
 # Load test data
@@ -115,9 +116,7 @@ def _recover_discrete_logs(outcomes, G, P, curve, order):
 # ---------------------------------------------------------------------------
 # Tier 1 — Classical verification (all 17 curves)
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize(
-    "entry", CURVES_AND_KEYS, ids=lambda e: f"{e['bit_length']}bit"
-)
+@pytest.mark.parametrize("entry", CURVES_AND_KEYS, ids=lambda e: f"{e['bit_length']}bit")
 def test_classical_verify(entry):
     """Verify G and P are on the curve and k·G = P."""
     p = entry["prime"]
@@ -135,9 +134,7 @@ def test_classical_verify(entry):
     result = G_pt
     for _ in range(k - 1):
         result = clECarithm.ell_add(result, G_pt, curve)
-    assert (result.x, result.y) == (xP, yP), (
-        f"k·G = ({result.x},{result.y}) != P = ({xP},{yP})"
-    )
+    assert (result.x, result.y) == (xP, yP), f"k·G = ({result.x},{result.y}) != P = ({xP},{yP})"
 
 
 # ---------------------------------------------------------------------------
@@ -178,12 +175,10 @@ def _record_metrics(entry, metrics):
     _save_results(results)
 
 
-@pytest.mark.parametrize(
-    "entry", _resource_entries, ids=lambda e: f"{e['bit_length']}bit"
-)
+@pytest.mark.parametrize("entry", _resource_entries, ids=lambda e: f"{e['bit_length']}bit")
 def test_resource_estimation(entry):
     """Build and compile the full Shor circuit; report resource metrics."""
-    anc, x1, x2 = _build_shor_circuit(entry)
+    anc, _x1, _x2 = _build_shor_circuit(entry)
     metrics = _compile_and_measure(anc)
     _record_metrics(entry, metrics)
 
@@ -234,8 +229,7 @@ def test_shor_simulation_4bit():
     recovered = _recover_discrete_logs(results.keys(), G, P, curve, order)
 
     assert expected_k in recovered, (
-        f"Failed to recover k={expected_k}. "
-        f"Candidates: {recovered}, outcomes: {results}"
+        f"Failed to recover k={expected_k}. Candidates: {recovered}, outcomes: {results}"
     )
 
 

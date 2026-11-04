@@ -14,9 +14,15 @@ Usage:
 
 import sys
 import time
+
 from qrisp import (
-    QuantumModulus, QuantumBool, QuantumArray, QuantumFloat,
-    measure, gidney_adder, count_ops, h, control
+    QuantumArray,
+    QuantumBool,
+    QuantumModulus,
+    count_ops,
+    gidney_adder,
+    h,
+    measure,
 )
 from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
 from qrisp.jasp import make_jaspr
@@ -37,19 +43,19 @@ G1_BI = BigInteger.create_static(G[1], 1)
 
 def run_test(name, make_jaspr_fn, count_ops_fn, count_ops_timeout=300):
     """Run a single test: first make_jaspr (fast), then count_ops (slow)."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {name}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # --- Phase 1: make_jaspr (tracing only) ---
-    print(f"  make_jaspr ...", end=" ", flush=True)
+    print("  make_jaspr ...", end=" ", flush=True)
     t0 = time.time()
     jaspr = make_jaspr(make_jaspr_fn)()
     elapsed = time.time() - t0
     print(f"done in {elapsed:.1f}s — {len(jaspr.eqns)} top-level eqns")
 
     # --- Phase 2: count_ops (profiling) ---
-    print(f"  count_ops  ...", end=" ", flush=True)
+    print("  count_ops  ...", end=" ", flush=True)
     t0 = time.time()
     try:
         ops = count_ops_fn()
@@ -141,9 +147,13 @@ def ctrl_add_count():
 # ============================================================
 if __name__ == "__main__":
     tests = {
-        "kaliski":  ("kaliski_mod_inv (4-bit BigInteger)", kaliski_circuit, kaliski_count),
-        "add":      ("q_ec_add_inpl uncontrolled (4-bit BigInteger)", add_circuit, add_count),
-        "ctrl_add": ("q_ec_add_inpl controlled (4-bit BigInteger)", ctrl_add_circuit, ctrl_add_count),
+        "kaliski": ("kaliski_mod_inv (4-bit BigInteger)", kaliski_circuit, kaliski_count),
+        "add": ("q_ec_add_inpl uncontrolled (4-bit BigInteger)", add_circuit, add_count),
+        "ctrl_add": (
+            "q_ec_add_inpl controlled (4-bit BigInteger)",
+            ctrl_add_circuit,
+            ctrl_add_count,
+        ),
     }
 
     # Parse CLI: run specific test or all
@@ -159,8 +169,8 @@ if __name__ == "__main__":
         elapsed = run_test(name, jaspr_fn, ops_fn)
         results[key] = elapsed
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for key, elapsed in results.items():
         print(f"  {key}: count_ops took {elapsed:.1f}s")

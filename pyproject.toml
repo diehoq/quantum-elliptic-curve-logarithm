@@ -2,3 +2,40 @@
 pythonpath = [
     "src"
 ]
+
+[tool.ruff]
+# Keep in step with the version pinned in .github/workflows/qrisp_test.yml.
+required-version = "==0.17.0"
+line-length = 100
+target-version = "py311"
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+    "E4", "E7", "E9",  # pycodestyle errors that the formatter does not fix
+    "F",               # pyflakes
+    "W",               # pycodestyle warnings
+    "I",               # import sorting
+    "B",               # bugbear
+    "UP",              # pyupgrade
+    "NPY",             # numpy-specific rules
+    "PLE",             # pylint errors
+    "RUF",             # ruff-specific rules
+]
+ignore = [
+    "E731",  # lambdas are passed to Qrisp's injection operator (`temp << (lambda x, y: x * y)`)
+    "E741",  # `l` is the slope λ, matching the notation of arXiv:2501.10228
+]
+
+# × is used deliberately in comments and labels (e.g. "2n × single_add").
+allowed-confusables = ["×"]
+
+[tool.ruff.lint.per-file-ignores]
+# Notebooks import after setup cells and keep exploratory code.
+"*.ipynb" = ["E402", "B018"]
+# boolean_simulation functions defined in a loop are traced immediately,
+# so capturing the loop variable is intended.
+"tests/*" = ["B023"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]

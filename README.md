@@ -127,6 +127,16 @@ pip install --no-deps -e ../Qrisp
 pip install -e .
 ```
 
+### Linting and formatting
+
+The code base, including the notebooks, is linted and formatted with [ruff](https://docs.astral.sh/ruff/); configuration lives in `pyproject.toml` and CI runs both checks on every push.
+
+```bash
+pip install ruff==0.17.0
+ruff check .          # add --fix to apply safe fixes
+ruff format .
+```
+
 ### Running the Algorithm
 
 **1. Full Shor ECDLP (small example):**

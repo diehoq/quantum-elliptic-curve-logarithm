@@ -1,10 +1,10 @@
-import qrisp
 import pytest
-import src.classical.ec_arithmetic as clECarithm
-import src.quantum.ec_arithmetic as qECarithm
+import qrisp
 from qrisp.alg_primitives.arithmetic.jasp_arithmetic.jasp_bigintiger import BigInteger
 from qrisp.jasp import make_jaspr
 
+import src.classical.ec_arithmetic as clECarithm
+import src.quantum.ec_arithmetic as qECarithm
 
 # Curve: y² = x³ + 5x + 4 mod 7
 CURVE = clECarithm.EllCurve(a=5, b=4, p=7)
@@ -12,12 +12,15 @@ P = (3, 5)  # base point (power)
 Q = (0, 2)  # initial point (res)
 
 
-@pytest.mark.parametrize("k_val,n_bits", [
-    (1, 1),   # single iteration: Q + 1*P
-    (1, 2),   # two iterations, second is no-op: Q + 1*P
-    (2, 2),   # two iterations: Q + 2*P
-    (3, 2),   # two iterations, both fire: Q + 3*P
-])
+@pytest.mark.parametrize(
+    "k_val,n_bits",
+    [
+        (1, 1),  # single iteration: Q + 1*P
+        (1, 2),  # two iterations, second is no-op: Q + 1*P
+        (2, 2),  # two iterations: Q + 2*P
+        (3, 2),  # two iterations, both fire: Q + 3*P
+    ],
+)
 def test_ell_mult_add(k_val, n_bits):
     """Test Q + k*P for small k values."""
     p = CURVE.p
@@ -89,12 +92,8 @@ def test_ell_mult_add_k_superposition():
     """Put k in an equal superposition of |1> and |2> and verify both outcomes."""
     p = CURVE.p
 
-    expected_1 = clECarithm.ell_mult_add(
-        clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), 1, CURVE
-    )
-    expected_2 = clECarithm.ell_mult_add(
-        clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), 2, CURVE
-    )
+    expected_1 = clECarithm.ell_mult_add(clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), 1, CURVE)
+    expected_2 = clECarithm.ell_mult_add(clECarithm.EllPoint(*P), clECarithm.EllPoint(*Q), 2, CURVE)
 
     res_0 = qrisp.QuantumModulus(p)
     res_0[:] = Q[0]
@@ -147,6 +146,7 @@ def test_ell_mult_add_biginteger_dynamic():
     ]
 
     for k_val, n_bits in cases:
+
         def run_mult_add():
             res_0 = qrisp.QuantumModulus(p_bi)
             res_0[:] = BigInteger.create_static(Q[0], BI_SIZE)
@@ -156,9 +156,7 @@ def test_ell_mult_add_biginteger_dynamic():
             k = qrisp.QuantumFloat(n_bits)
             k[:] = k_val
 
-            result = qECarithm.q_ec_mult_add(
-                list(P), [res_0, res_1], k, CURVE_BI, n_bits=n_bits
-            )
+            result = qECarithm.q_ec_mult_add(list(P), [res_0, res_1], k, CURVE_BI, n_bits=n_bits)
             return qrisp.measure(result[0]), qrisp.measure(result[1])
 
         jaspr = make_jaspr(run_mult_add)()
@@ -170,6 +168,7 @@ def test_ell_mult_add_biginteger_dynamic():
 def test_ec_add_inpl_biginteger_dynamic():
     """Compile a single EC addition step with BigInteger modulus."""
     p_bi = CURVE_BI.p
+
     def run_add():
         res_0 = qrisp.QuantumModulus(p_bi, inpl_adder=qrisp.gidney_adder)
         res_0[:] = BigInteger.create_static(Q[0], BI_SIZE)

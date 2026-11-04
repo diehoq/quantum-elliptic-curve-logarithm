@@ -1,7 +1,8 @@
+import pytest
+import qrisp
+
 import src.classical.ec_arithmetic as clECarithm
 import src.quantum.ec_arithmetic as qECarithm
-import qrisp
-import pytest
 
 curves_with_points = [
     # {
@@ -114,9 +115,7 @@ def test_ec_addition(curve_data):
     points = curve_data["points"]
     base_point_coords = curve_data["base_point"]
 
-    curve = clECarithm.EllCurve(
-        a=curve_params["a"], b=curve_params["b"], p=curve_params["p"]
-    )
+    curve = clECarithm.EllCurve(a=curve_params["a"], b=curve_params["b"], p=curve_params["p"])
 
     base_point_ell = clECarithm.EllPoint(base_point_coords[0], base_point_coords[1])
     base_point_qrisp = list(base_point_coords)
@@ -131,9 +130,9 @@ def test_ec_addition(curve_data):
         result_ell = clECarithm.ell_add_generic(P_ell, base_point_ell, curve)
         qECarithm.q_ec_add_inpl([anc_0, anc_1], base_point_qrisp, curve_params["p"])
 
-        assert qrisp.multi_measurement([anc_0, anc_1]) == {
-            (result_ell.x, result_ell.y): 1
-        }, f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
+        assert qrisp.multi_measurement([anc_0, anc_1]) == {(result_ell.x, result_ell.y): 1}, (
+            f"Coordinate mismatch for point {point} on curve with a={curve.a}, b={curve.b}, p={curve.p}"
+        )
 
 
 @pytest.mark.parametrize("curve_data", curves_with_points)
@@ -192,9 +191,7 @@ def test_ec_addition_dynamic(curve_data, no_faulty_uncomputation):
     points = curve_data["points"]
     base_point_coords = curve_data["base_point"]
 
-    curve = clECarithm.EllCurve(
-        a=curve_params["a"], b=curve_params["b"], p=curve_params["p"]
-    )
+    curve = clECarithm.EllCurve(a=curve_params["a"], b=curve_params["b"], p=curve_params["p"])
 
     base_point_ell = clECarithm.EllPoint(base_point_coords[0], base_point_coords[1])
     base_point_qrisp = list(base_point_coords)
